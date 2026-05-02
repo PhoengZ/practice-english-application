@@ -1,0 +1,6 @@
+streamlit
+pandas
+requests
+openai
+python-dotenv
+typhoon-ocr
