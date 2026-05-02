@@ -26,7 +26,7 @@ def translate_to_thai_batch(english_words, batch_size=50):
         
         try:
             response = client.chat.completions.create(
-                model="scb10x/typhoon-v1.5-8b-instruct",
+                model="typhoon-v2.5-30b-a3b-instruct",
                 messages=[
                     {"role": "system", "content": "You are an English-to-Thai translator. Output exactly one Thai translation per line. No English, no explanations."},
                     {"role": "user", "content": prompt}
@@ -35,7 +35,7 @@ def translate_to_thai_batch(english_words, batch_size=50):
             )
             thai_lines = [line.strip() for line in response.choices[0].message.content.strip().split('\n') if line.strip()]
             
-            # Match back to English words, being careful with count mismatches
+            # Match back to English words
             for eng, thai in zip(batch, thai_lines):
                 all_translations[eng] = thai
         except Exception as e:
@@ -45,36 +45,22 @@ def translate_to_thai_batch(english_words, batch_size=50):
 
 def parse_oxford_ocr(text):
     """
-    Parses the Oxford 3000 OCR text to extract English words.
-    Handles 'word pos level' format and common OCR variations.
+    Parses the Oxford 3000 OCR text in 'word, type, level' format.
     """
-    # Pattern to capture words followed by common part-of-speech markers
-    # Also handles lines that might just start with the word and have markers later
-    pattern = r"^([a-zA-Z\s\-\'\/12,]+?)(?:\s+|,|\.|$)\s*(?:v\.|n\.|adj\.|adv\.|prep\.|conj\.|pron\.|exclam\.|det\.|number|auxiliary|modal)"
-    
     words = []
     lines = text.split('\n')
     for line in lines:
         line = line.strip()
         if not line: continue
         
-        match = re.search(pattern, line)
-        if match:
-            word = match.group(1).strip()
-            # Clean up 'can1' -> 'can' or trailing commas
-            word = re.sub(r'\d+$', '', word)
-            word = word.rstrip(',').strip()
-            if word and word not in words:
-                words.append(word)
-        else:
-            # Fallback for simple lines or multi-word entries without clear markers
-            # If the line looks like a vocab entry but missed the pattern
-            parts = line.split()
-            if parts and len(parts[0]) > 1:
-                word = parts[0].rstrip(',').strip()
-                if word not in words and word.isalpha():
+        # Split by comma and take the first part (the word)
+        parts = line.split(',')
+        if parts:
+            word = parts[0].strip()
+            # Basic validation: ensure it's not just a header or empty
+            if word and not word.startswith('©') and not word.startswith('The Oxford'):
+                if word not in words:
                     words.append(word)
-
     return words
 
 def extract_text_from_pdf(pdf_path):

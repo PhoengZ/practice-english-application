@@ -27,12 +27,18 @@ def ocr_pdf_to_file(pdf_path, output_txt):
             base64_image = encode_image(page)
             
             response = client.chat.completions.create(
-                model="scb10x/typhoon-v1.5-vision-instruct",
+                model="typhoon-ocr",
                 messages=[
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": "Extract all text from this document page. Maintain the list format."},
+                            {
+                                "type": "text", 
+                                "text": "Extract all vocabulary entries from this document page. "
+                                        "For each entry, format it exactly as: word, type, level. "
+                                        "Example: abandon, v., B2. "
+                                        "Only output the comma-separated list, one per line."
+                            },
                             {
                                 "type": "image_url",
                                 "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
