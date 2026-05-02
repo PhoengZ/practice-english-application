@@ -3,8 +3,14 @@ import random
 import sys
 import subprocess
 import os
+import io
 from datetime import datetime
 from db_manager import should_run_today, mark_day_completed, DB_PATH, get_logical_day
+
+# Fix Windows encoding for Thai characters
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
 
 def get_words_for_practice(count=10):
     conn = sqlite3.connect(DB_PATH)
