@@ -40,14 +40,14 @@ def create_shortcuts():
     # 1. Create Practice.bat in root
     practice_bat = os.path.join(root_dir, "Practice.bat")
     with open(practice_bat, "w") as f:
-        f.write(f'@echo off\n"{python_exe}" "{app_path}" --force\n')
+        f.write(f'@echo off\n"{python_exe}" "{app_path}" --force\npause\n')
     print(f"✅ Created {practice_bat}")
 
     # 2. Create Dashboard.bat in root
     dashboard_bat = os.path.join(root_dir, "Dashboard.bat")
     with open(dashboard_bat, "w") as f:
         # Streamlit needs to run from the project root to find modules
-        f.write(f'@echo off\ncd /d "{root_dir}"\n"{streamlit_exe}" run "{dashboard_path}"\n')
+        f.write(f'@echo off\ncd /d "{root_dir}"\n"{streamlit_exe}" run "{dashboard_path}"\npause\n')
     print(f"✅ Created {dashboard_bat}")
 
     # 3. Add project root to PATH
@@ -59,7 +59,8 @@ def add_to_startup():
     root_dir = os.path.dirname(script_dir)
     app_path = os.path.join(root_dir, "src", "ui", "app.py")
     
-    cmd = f'"{python_exe}" "{app_path}"'
+    # Use cmd /c to set working directory before running python
+    cmd = f'cmd /c "cd /d {root_dir} && {python_exe} {app_path}"'
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)

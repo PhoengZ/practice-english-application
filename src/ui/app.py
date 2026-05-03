@@ -111,7 +111,7 @@ def run_practice():
                 print("Opening Dashboard...")
                 # Get the absolute path to dashboard.py
                 dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
-                subprocess.Popen(["streamlit", "run", dashboard_path], shell=True)
+                subprocess.Popen(["streamlit", "run", dashboard_path])
                 continue
 
             try:
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     elif wants_dashboard:
         print("Opening Dashboard...")
         dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
-        subprocess.Popen(["streamlit", "run", dashboard_path], shell=True)
+        subprocess.Popen(["streamlit", "run", dashboard_path])
     else:
         print("Already practiced today! See you after 7 AM tomorrow.")
         print("💡 Tip: Use 'Practice' command to force start anyway.")
