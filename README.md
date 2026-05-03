@@ -17,25 +17,25 @@ The application follows a modular architecture consisting of four main layers: *
 ```mermaid
 graph TD
     subgraph "Data Layer"
-        RAW[oxford.txt] --> CLEANER[clean_and_reset.py]
+        RAW[data/oxford.txt] --> CLEANER[scripts/clean_and_reset.py]
         CLEANER -- "LLM Cleaning" --> TYPHOON[Typhoon LLM API]
         TYPHOON -- "Structured List" --> CLEANER
-        CLEANER --> CLEAN[oxford_clean.txt]
+        CLEANER --> CLEAN[data/oxford_clean.txt]
     end
 
     subgraph "Storage Layer"
-        CLEAN --> INGEST[ingest.py]
+        CLEAN --> INGEST[src/core/ingest.py]
         INGEST -- "Type-Aware Translation" --> TYPHOON
-        INGEST --> DB[(practice.db)]
+        INGEST --> DB[(data/practice.db)]
     end
 
     subgraph "User Interface Layer"
-        DB <--> |"Word Data & Stats"| APP[app.py / Practice]
-        DB <--> |"Aggregated Data"| DASH[dashboard.py / Dashboard]
+        DB <--> |"Word Data & Stats"| APP[src/ui/app.py / Practice]
+        DB <--> |"Aggregated Data"| DASH[src/ui/dashboard.py / Dashboard]
     end
 
     subgraph "Infrastructure Layer"
-        SETUP[setup_startup.py] --> REG[Windows Registry]
+        SETUP[scripts/setup_startup.py] --> REG[Windows Registry]
         SETUP --> PATH[System PATH]
         REG -- "Auto-Run" --> APP
         PATH -- "Global Command" --> APP
@@ -115,13 +115,80 @@ python list_words.py
 ```
 
 ## Project Structure
-- `app.py`: The core CLI practice application.
-- `dashboard.py`: Interactive Streamlit dashboard.
-- `clean_and_reset.py`: Uses Typhoon LLM to clean raw OCR text and triggers ingestion.
-- `db_manager.py`: Handles SQLite database operations and logical day tracking.
-- `setup_startup.py`: Configures Windows startup registry and global PATH shortcuts.
-- `typhoon_utils.py`: Contains API integration for translation and cleaning.
-- `list_words.py`: Utility to view all words in the database.
+
+The project has been restructured for better scalability and maintainability:
+
+```text
+practice-english-application/
+├── src/                # Source code
+│   ├── core/           # Core logic (ingestion, OCR, utilities)
+│   ├── database/       # Database management
+│   └── ui/             # User interface (CLI app, dashboard)
+├── scripts/            # Maintenance and setup scripts
+├── data/               # Data files (PDFs, text, database)
+├── Practice.bat        # Shortcut for practice session
+├── Dashboard.bat       # Shortcut for dashboard
+└── requirements.txt    # Project dependencies
+```
+
+## Component Interaction
+
+### 1. The Data Pipeline (One-time setup)
+- **`scripts/clean_and_reset.py`**: The orchestrator. It reads the messy `data/oxford.txt`, sends chunks to **Typhoon LLM** via `src/core/typhoon_utils.py` to fix OCR errors, and saves a perfectly formatted `data/oxford_clean.txt`.
+- **`src/core/ingest.py`**: Takes the cleaned text, identifies unique words, and requests **Type-Aware Translations** before populating the SQLite database.
+
+### 2. Practice & Logic (Daily use)
+- **`src/database/db_manager.py`**: The "Brain" of the project. It defines the database schema and calculates the **Logical Day**.
+- **`src/ui/app.py`**: The core interactive CLI. It fetches words from the DB and handles the quiz logic.
+
+### 3. Insights & Visualization
+- **`src/ui/dashboard.py`**: A **Streamlit** application that queries the database to generate interactive **Plotly** charts.
+
+### 4. Integration & Convenience
+- **`scripts/setup_startup.py`**: Connects the project to your operating system. It creates global batch file shortcuts (`Practice.bat`, `Dashboard.bat`) in the root directory.
+
+## Installation
+
+### 4. Ingest Vocabulary
+Run the cleaning script to process the Oxford 3000 list and populate your database:
+```powershell
+python scripts/clean_and_reset.py
+```
+
+### 5. Setup Global Commands and Startup
+Run the setup script to enable global commands and auto-startup:
+```powershell
+python scripts/setup_startup.py
+```
+
+## Usage
+
+### Daily Practice
+Simply turn on your computer! Or manually start from the root:
+```powershell
+./Practice.bat
+```
+
+### View Progress
+To see your learning trends and word statistics:
+```powershell
+./Dashboard.bat
+```
+
+### List All Words
+To see the full list of ingested vocabulary:
+```powershell
+python scripts/list_words.py
+```
+
+## File Locations
+- `src/ui/app.py`: The core CLI practice application.
+- `src/ui/dashboard.py`: Interactive Streamlit dashboard.
+- `scripts/clean_and_reset.py`: Uses Typhoon LLM to clean raw OCR text.
+- `src/database/db_manager.py`: Handles SQLite database operations.
+- `scripts/setup_startup.py`: Configures Windows startup and global PATH shortcuts.
+- `src/core/typhoon_utils.py`: API integration for translation and cleaning.
+- `scripts/list_words.py`: Utility to view all words.
 
 ---
 *Happy Learning!*

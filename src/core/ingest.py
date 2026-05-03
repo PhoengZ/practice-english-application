@@ -1,8 +1,15 @@
 import sys
+import os
 import sqlite3
 import argparse
-from typhoon_utils import extract_text_from_pdf, translate_to_thai_batch, parse_oxford_ocr
-from db_manager import DB_PATH
+
+# Ensure we can import from src when running from any directory
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT_DIR not in sys.path:
+    sys.path.append(ROOT_DIR)
+
+from src.core.typhoon_utils import extract_text_from_pdf, translate_to_thai_batch, parse_oxford_ocr
+from src.database.db_manager import DB_PATH
 
 def ingest_from_text(ocr_text):
     """Ingests words directly from OCR text string."""

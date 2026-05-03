@@ -3,8 +3,9 @@ import os
 from datetime import datetime, timedelta
 
 # Ensure DB_PATH is absolute so it works from any directory
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "practice.db")
+# Moved to root data folder
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DB_PATH = os.path.join(BASE_DIR, "data", "practice.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)

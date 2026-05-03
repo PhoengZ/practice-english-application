@@ -1,7 +1,11 @@
 import sqlite3
 import sys
 import io
-from db_manager import DB_PATH
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import sys
+sys.path.append(BASE_DIR)
+from src.database.db_manager import DB_PATH
 
 # Fix Windows encoding for Thai characters
 if sys.platform == "win32":

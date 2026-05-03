@@ -1,5 +1,9 @@
 import sqlite3
-from db_manager import DB_PATH
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import sys
+sys.path.append(BASE_DIR)
+from src.database.db_manager import DB_PATH
 
 def populate_sample():
     conn = sqlite3.connect(DB_PATH)

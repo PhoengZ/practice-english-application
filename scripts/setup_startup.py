@@ -24,10 +24,12 @@ def add_to_path(folder_path):
         print(f"❌ Error updating PATH: {e}")
 
 def create_shortcuts():
+    # Scripts is in scripts/, Root is one level up
     script_dir = os.path.dirname(os.path.realpath(__file__))
+    root_dir = os.path.dirname(script_dir)
     python_exe = sys.executable
-    app_path = os.path.join(script_dir, "app.py")
-    dashboard_path = os.path.join(script_dir, "dashboard.py")
+    app_path = os.path.join(root_dir, "src", "ui", "app.py")
+    dashboard_path = os.path.join(root_dir, "src", "ui", "dashboard.py")
     
     # Path to streamlit.exe (usually in the same folder as python.exe or in Scripts)
     streamlit_exe = os.path.join(os.path.dirname(python_exe), "Scripts", "streamlit.exe")
@@ -35,26 +37,27 @@ def create_shortcuts():
         # Fallback for some installations
         streamlit_exe = os.path.join(os.path.dirname(python_exe), "streamlit.exe")
 
-    # 1. Create Practice.bat
-    practice_bat = os.path.join(script_dir, "Practice.bat")
+    # 1. Create Practice.bat in root
+    practice_bat = os.path.join(root_dir, "Practice.bat")
     with open(practice_bat, "w") as f:
         f.write(f'@echo off\n"{python_exe}" "{app_path}" --force\n')
     print(f"✅ Created {practice_bat}")
 
-    # 2. Create Dashboard.bat
-    dashboard_bat = os.path.join(script_dir, "Dashboard.bat")
+    # 2. Create Dashboard.bat in root
+    dashboard_bat = os.path.join(root_dir, "Dashboard.bat")
     with open(dashboard_bat, "w") as f:
-        # Streamlit needs to run from the project directory to find modules
-        f.write(f'@echo off\ncd /d "{script_dir}"\n"{streamlit_exe}" run "{dashboard_path}"\n')
+        # Streamlit needs to run from the project root to find modules
+        f.write(f'@echo off\ncd /d "{root_dir}"\n"{streamlit_exe}" run "{dashboard_path}"\n')
     print(f"✅ Created {dashboard_bat}")
 
-    # 3. Add project dir to PATH
-    add_to_path(script_dir)
+    # 3. Add project root to PATH
+    add_to_path(root_dir)
 
 def add_to_startup():
     python_exe = sys.executable
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    app_path = os.path.join(script_dir, "app.py")
+    root_dir = os.path.dirname(script_dir)
+    app_path = os.path.join(root_dir, "src", "ui", "app.py")
     
     cmd = f'"{python_exe}" "{app_path}"'
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
