@@ -4,3 +4,5 @@ requests
 openai
 python-dotenv
 typhoon-ocr
+plotly
+matplotlib

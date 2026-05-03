@@ -17,7 +17,7 @@ def get_words_for_practice(count=10):
     cursor = conn.cursor()
     # Prioritize words least tested or least correct
     cursor.execute('''
-        SELECT id, english_word, thai_translation 
+        SELECT id, english_word, word_type, word_level, thai_translation 
         FROM words 
         ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
         LIMIT ?
@@ -33,6 +33,7 @@ def get_distractors(correct_thai, count=3):
         SELECT thai_translation 
         FROM words 
         WHERE thai_translation != ? 
+        GROUP BY thai_translation
         ORDER BY RANDOM() 
         LIMIT ?
     ''', (correct_thai, count))
@@ -88,8 +89,8 @@ def run_practice():
     score = 0
     total = len(words)
 
-    for i, (word_id, eng, thai) in enumerate(words):
-        print(f"\nWord {i+1}/{total}: {eng}")
+    for i, (word_id, eng, w_type, level, thai) in enumerate(words):
+        print(f"\nWord {i+1}/{total}: {eng} ({w_type}) [{level}]")
         
         choices = get_distractors(thai) + [thai]
         random.shuffle(choices)
@@ -131,11 +132,15 @@ def run_practice():
     mark_day_completed()
 
 if __name__ == "__main__":
-    if should_run_today():
+    # Check for command line arguments
+    force_run = len(sys.argv) > 1 and sys.argv[1].lower() == '--force'
+    wants_dashboard = len(sys.argv) > 1 and sys.argv[1].lower() == 'dashboard'
+
+    if should_run_today() or force_run:
         run_practice()
+    elif wants_dashboard:
+        print("Opening Dashboard...")
+        subprocess.Popen(["streamlit", "run", "dashboard.py"], shell=True)
     else:
-        # Check if user manually ran it and wants dashboard
-        if len(sys.argv) > 1 and sys.argv[1].lower() == 'dashboard':
-            subprocess.Popen(["streamlit", "run", "dashboard.py"], shell=True)
-        else:
-            print("Already practiced today! See you after 7 AM tomorrow.")
+        print("Already practiced today! See you after 7 AM tomorrow.")
+        print("💡 Tip: Use 'Practice' command to force start anyway.")

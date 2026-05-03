@@ -6,32 +6,48 @@ from db_manager import DB_PATH
 
 def ingest_from_text(ocr_text):
     """Ingests words directly from OCR text string."""
-    eng_words = parse_oxford_ocr(ocr_text)
-    if not eng_words:
+    # Parse lines: 'word, type, level'
+    entries = []
+    lines = ocr_text.split('\n')
+    word_type_pairs = []
+    
+    for line in lines:
+        parts = [p.strip() for p in line.split(',') if p.strip()]
+        if len(parts) >= 3:
+            word, w_type, level = parts[0], parts[1], parts[2]
+            entries.append((word, w_type, level))
+            word_type_pairs.append((word, w_type))
+            
+    if not entries:
         print("No words identified in the provided text.")
         return
 
-    print(f"Identified {len(eng_words)} unique English words.")
+    print(f"Identified {len(entries)} vocabulary entries.")
     
-    # 2. Translate in batches
-    translations = translate_to_thai_batch(eng_words)
+    # 2. Translate (word, type) pairs in batches
+    translations = translate_to_thai_batch(word_type_pairs)
 
     # 3. Save to DB
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     count = 0
-    for eng, thai in translations.items():
+    for eng, w_type, level in entries:
+        # Match using composite key
+        thai = translations.get(f"{eng}|{w_type}", "")
         try:
-            cursor.execute("INSERT OR IGNORE INTO words (english_word, thai_translation) VALUES (?, ?)", (eng, thai))
+            cursor.execute(
+                "INSERT OR IGNORE INTO words (english_word, word_type, word_level, thai_translation) VALUES (?, ?, ?, ?)", 
+                (eng, w_type, level, thai)
+            )
             if cursor.rowcount > 0:
                 count += 1
         except Exception as e:
-            pass
+            print(f"Error inserting {eng}: {e}")
             
     conn.commit()
     conn.close()
-    print(f"Successfully ingested {count} new words into the database.")
+    print(f"Successfully ingested {count} new entries into the database.")
 
 def ingest_pdf(pdf_path):
     # In a real scenario, we'd use Typhoon OCR on the file

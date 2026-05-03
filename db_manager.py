@@ -2,7 +2,9 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 
-DB_PATH = "practice.db"
+# Ensure DB_PATH is absolute so it works from any directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "practice.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -12,11 +14,14 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS words (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            english_word TEXT UNIQUE,
+            english_word TEXT,
+            word_type TEXT,
+            word_level TEXT,
             thai_translation TEXT,
             times_tested INTEGER DEFAULT 0,
             times_correct INTEGER DEFAULT 0,
-            last_tested_date DATETIME
+            last_tested_date DATETIME,
+            UNIQUE(english_word, word_type)
         )
     ''')
     

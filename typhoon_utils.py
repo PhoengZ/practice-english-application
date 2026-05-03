@@ -10,34 +10,39 @@ BASE_URL = "https://api.opentyphoon.ai/v1"
 
 client = OpenAI(api_key=TYPHOON_API_KEY, base_url=BASE_URL)
 
-def translate_to_thai_batch(english_words, batch_size=50):
-    """Translates English words to Thai in batches to avoid truncation."""
+def translate_to_thai_batch(word_type_pairs, batch_size=50):
+    """
+    Translates English (word, type) pairs to Thai in batches.
+    word_type_pairs: List of tuples (word, type)
+    """
     if not TYPHOON_API_KEY:
         print("Warning: TYPHOON_API_KEY not found. Using mock translations.")
-        return {word: f"ไทย-{word}" for word in english_words}
+        return {f"{word}|{w_type}": f"ไทย-{word}" for word, w_type in word_type_pairs}
 
     all_translations = {}
     
-    for i in range(0, len(english_words), batch_size):
-        batch = english_words[i:i + batch_size]
-        print(f"Translating batch {i//batch_size + 1} ({len(batch)} words)...")
+    for i in range(0, len(word_type_pairs), batch_size):
+        batch = word_type_pairs[i:i + batch_size]
+        print(f"Translating batch {i//batch_size + 1} ({len(batch)} entries)...")
         
-        prompt = f"Translate these English words to Thai (one per line, only the Thai word):\n" + "\n".join(batch)
+        # Format: "word (type)"
+        formatted_batch = [f"{word} ({w_type})" for word, w_type in batch]
+        prompt = f"Translate these English words to Thai, considering their part of speech in parentheses (one translation per line, only the Thai word):\n" + "\n".join(formatted_batch)
         
         try:
             response = client.chat.completions.create(
                 model="typhoon-v2.5-30b-a3b-instruct",
                 messages=[
-                    {"role": "system", "content": "You are an English-to-Thai translator. Output exactly one Thai translation per line. No English, no explanations."},
+                    {"role": "system", "content": "You are an English-to-Thai translator. Output exactly one Thai translation per line. No English, no explanations. Provide the most common translation that matches the part of speech provided."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1
             )
             thai_lines = [line.strip() for line in response.choices[0].message.content.strip().split('\n') if line.strip()]
             
-            # Match back to English words
-            for eng, thai in zip(batch, thai_lines):
-                all_translations[eng] = thai
+            # Match back using a composite key
+            for (word, w_type), thai in zip(batch, thai_lines):
+                all_translations[f"{word}|{w_type}"] = thai
         except Exception as e:
             print(f"Batch translation error at index {i}: {e}")
             
