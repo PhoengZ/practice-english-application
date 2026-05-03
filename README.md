@@ -43,21 +43,38 @@ graph TD
     end
 ```
 
+## Project Structure
+
+The project has been restructured for better scalability and maintainability:
+
+```text
+practice-english-application/
+├── src/                # Source code
+│   ├── core/           # Core logic (ingestion, OCR, utilities)
+│   ├── database/       # Database management
+│   └── ui/             # User interface (CLI app, dashboard)
+├── scripts/            # Maintenance and setup scripts
+├── data/               # Data files (PDFs, text, database)
+├── Practice.bat        # Shortcut for practice session
+├── Dashboard.bat       # Shortcut for dashboard
+└── requirements.txt    # Project dependencies
+```
+
 ## Component Interaction
 
 ### 1. The Data Pipeline (One-time setup)
-- **`clean_and_reset.py`**: The orchestrator. It reads the messy `oxford.txt`, sends chunks to **Typhoon LLM** via `typhoon_utils.py` to fix OCR errors, and saves a perfectly formatted `oxford_clean.txt`.
-- **`ingest.py`**: Takes the cleaned text, identifies unique words, and requests **Type-Aware Translations** (e.g., distinguishing between *act* as a noun or verb) before populating the SQLite database.
+- **`scripts/clean_and_reset.py`**: The orchestrator. It reads the messy `data/oxford.txt`, sends chunks to **Typhoon LLM** via `src/core/typhoon_utils.py` to fix OCR errors, and saves a perfectly formatted `data/oxford_clean.txt`.
+- **`src/core/ingest.py`**: Takes the cleaned text, identifies unique words, and requests **Type-Aware Translations** before populating the SQLite database.
 
 ### 2. Practice & Logic (Daily use)
-- **`db_manager.py`**: The "Brain" of the project. It defines the database schema and calculates the **Logical Day** (resetting at 7:00 AM instead of midnight), ensuring you only get prompted once per day.
-- **`app.py`**: The core interactive CLI. It fetches words from the DB based on your performance (prioritizing words you struggle with), handles the quiz logic, and updates your statistics in real-time.
+- **`src/database/db_manager.py`**: The "Brain" of the project. It defines the database schema and calculates the **Logical Day** (resetting at 7:00 AM instead of midnight), ensuring you only get prompted once per day.
+- **`src/ui/app.py`**: The core interactive CLI. It fetches words from the DB based on your performance (prioritizing words you struggle with), handles the quiz logic, and updates your statistics in real-time.
 
 ### 3. Insights & Visualization
-- **`dashboard.py`**: A **Streamlit** application that queries the database to generate interactive **Plotly** charts. It calculates accuracy trends over time and identifies the top 10 "trouble words" for you to focus on.
+- **`src/ui/dashboard.py`**: A **Streamlit** application that queries the database to generate interactive **Plotly** charts. It calculates accuracy trends over time and identifies the top 10 "trouble words" for you to focus on.
 
 ### 4. Integration & Convenience
-- **`setup_startup.py`**: Connects the project to your operating system. It creates global batch file shortcuts (`Practice.bat`, `Dashboard.bat`) and ensures `app.py` is called by Windows every time you log in.
+- **`scripts/setup_startup.py`**: Connects the project to your operating system. It creates global batch file shortcuts (`Practice.bat`, `Dashboard.bat`) in the root directory and ensures `src/ui/app.py` is called by Windows every time you log in.
 
 ## Installation
 
@@ -85,13 +102,13 @@ TYPHOON_API_KEY=your_api_key_here
 ### 4. Ingest Vocabulary
 Run the cleaning script to process the Oxford 3000 list and populate your database:
 ```powershell
-python clean_and_reset.py
+python scripts/clean_and_reset.py
 ```
 
 ### 5. Setup Global Commands and Startup
 Run the setup script to enable global commands and auto-startup (Restarting terminal required after this):
 ```powershell
-python setup_startup.py
+python scripts/setup_startup.py
 ```
 
 ## Usage
@@ -101,70 +118,7 @@ Simply turn on your computer! If it's after 7 AM and you haven't practiced yet, 
 ```powershell
 Practice
 ```
-
-### View Progress
-To see your learning trends and word statistics:
-```powershell
-Dashboard
-```
-
-### List All Words
-To see the full list of ingested vocabulary in the terminal:
-```powershell
-python list_words.py
-```
-
-## Project Structure
-
-The project has been restructured for better scalability and maintainability:
-
-```text
-practice-english-application/
-├── src/                # Source code
-│   ├── core/           # Core logic (ingestion, OCR, utilities)
-│   ├── database/       # Database management
-│   └── ui/             # User interface (CLI app, dashboard)
-├── scripts/            # Maintenance and setup scripts
-├── data/               # Data files (PDFs, text, database)
-├── Practice.bat        # Shortcut for practice session
-├── Dashboard.bat       # Shortcut for dashboard
-└── requirements.txt    # Project dependencies
-```
-
-## Component Interaction
-
-### 1. The Data Pipeline (One-time setup)
-- **`scripts/clean_and_reset.py`**: The orchestrator. It reads the messy `data/oxford.txt`, sends chunks to **Typhoon LLM** via `src/core/typhoon_utils.py` to fix OCR errors, and saves a perfectly formatted `data/oxford_clean.txt`.
-- **`src/core/ingest.py`**: Takes the cleaned text, identifies unique words, and requests **Type-Aware Translations** before populating the SQLite database.
-
-### 2. Practice & Logic (Daily use)
-- **`src/database/db_manager.py`**: The "Brain" of the project. It defines the database schema and calculates the **Logical Day**.
-- **`src/ui/app.py`**: The core interactive CLI. It fetches words from the DB and handles the quiz logic.
-
-### 3. Insights & Visualization
-- **`src/ui/dashboard.py`**: A **Streamlit** application that queries the database to generate interactive **Plotly** charts.
-
-### 4. Integration & Convenience
-- **`scripts/setup_startup.py`**: Connects the project to your operating system. It creates global batch file shortcuts (`Practice.bat`, `Dashboard.bat`) in the root directory.
-
-## Installation
-
-### 4. Ingest Vocabulary
-Run the cleaning script to process the Oxford 3000 list and populate your database:
-```powershell
-python scripts/clean_and_reset.py
-```
-
-### 5. Setup Global Commands and Startup
-Run the setup script to enable global commands and auto-startup:
-```powershell
-python scripts/setup_startup.py
-```
-
-## Usage
-
-### Daily Practice
-Simply turn on your computer! Or manually start from the root:
+Or from the root directory:
 ```powershell
 ./Practice.bat
 ```
@@ -172,23 +126,18 @@ Simply turn on your computer! Or manually start from the root:
 ### View Progress
 To see your learning trends and word statistics:
 ```powershell
+Dashboard
+```
+Or from the root directory:
+```powershell
 ./Dashboard.bat
 ```
 
 ### List All Words
-To see the full list of ingested vocabulary:
+To see the full list of ingested vocabulary in the terminal:
 ```powershell
 python scripts/list_words.py
 ```
-
-## File Locations
-- `src/ui/app.py`: The core CLI practice application.
-- `src/ui/dashboard.py`: Interactive Streamlit dashboard.
-- `scripts/clean_and_reset.py`: Uses Typhoon LLM to clean raw OCR text.
-- `src/database/db_manager.py`: Handles SQLite database operations.
-- `scripts/setup_startup.py`: Configures Windows startup and global PATH shortcuts.
-- `src/core/typhoon_utils.py`: API integration for translation and cleaning.
-- `scripts/list_words.py`: Utility to view all words.
 
 ---
 *Happy Learning!*

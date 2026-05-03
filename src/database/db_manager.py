@@ -8,6 +8,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DB_PATH = os.path.join(BASE_DIR, "data", "practice.db")
 
 def init_db():
+    # Ensure data directory exists
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
@@ -58,6 +60,7 @@ def get_logical_day():
 
 def should_run_today():
     logical_day = get_logical_day()
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT value FROM app_state WHERE key = 'last_run_date'")
@@ -70,6 +73,7 @@ def should_run_today():
 
 def mark_day_completed():
     logical_day = get_logical_day()
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_run_date', ?)", (logical_day,))

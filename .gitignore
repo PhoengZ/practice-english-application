@@ -13,10 +13,16 @@ env.bak/
 venv.bak/
 
 # SQLite Database
+data/practice.db
 practice.db
 
 # OCR / Generated files
+data/oxford_clean.txt
 oxford_clean.txt
+
+# Batch file artifacts (locally generated)
+Practice.bat
+Dashboard.bat
 
 # IDEs
 .vscode/
