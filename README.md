@@ -9,6 +9,56 @@ This project is designed for tech-savvy individuals who spend their entire day a
 - **Interactive Dashboard**: A beautiful Streamlit dashboard with Plotly graphs to track your accuracy and identify words that need more focus.
 - **Global Shortcuts**: Launch practice or the dashboard from any terminal using `Practice` or `Dashboard` commands.
 
+## Project Architecture
+
+The application follows a modular architecture consisting of four main layers: **Data Ingestion**, **Storage**, **Application Logic**, and **Infrastructure**.
+
+### High-Level Architecture Diagram
+```mermaid
+graph TD
+    subgraph "Data Layer"
+        RAW[oxford.txt] --> CLEANER[clean_and_reset.py]
+        CLEANER -- "LLM Cleaning" --> TYPHOON[Typhoon LLM API]
+        TYPHOON -- "Structured List" --> CLEANER
+        CLEANER --> CLEAN[oxford_clean.txt]
+    end
+
+    subgraph "Storage Layer"
+        CLEAN --> INGEST[ingest.py]
+        INGEST -- "Type-Aware Translation" --> TYPHOON
+        INGEST --> DB[(practice.db)]
+    end
+
+    subgraph "User Interface Layer"
+        DB <--- "Word Data & Stats" ---> APP[app.py / Practice]
+        DB <--- "Aggregated Data" ---> DASH[dashboard.py / Dashboard]
+    end
+
+    subgraph "Infrastructure Layer"
+        SETUP[setup_startup.py] --> REG[Windows Registry]
+        SETUP --> PATH[System PATH]
+        REG -- "Auto-Run" --> APP
+        PATH -- "Global Command" --> APP
+        PATH -- "Global Command" --> DASH
+    end
+```
+
+## Component Interaction
+
+### 1. The Data Pipeline (One-time setup)
+- **`clean_and_reset.py`**: The orchestrator. It reads the messy `oxford.txt`, sends chunks to **Typhoon LLM** via `typhoon_utils.py` to fix OCR errors, and saves a perfectly formatted `oxford_clean.txt`.
+- **`ingest.py`**: Takes the cleaned text, identifies unique words, and requests **Type-Aware Translations** (e.g., distinguishing between *act* as a noun or verb) before populating the SQLite database.
+
+### 2. Practice & Logic (Daily use)
+- **`db_manager.py`**: The "Brain" of the project. It defines the database schema and calculates the **Logical Day** (resetting at 7:00 AM instead of midnight), ensuring you only get prompted once per day.
+- **`app.py`**: The core interactive CLI. It fetches words from the DB based on your performance (prioritizing words you struggle with), handles the quiz logic, and updates your statistics in real-time.
+
+### 3. Insights & Visualization
+- **`dashboard.py`**: A **Streamlit** application that queries the database to generate interactive **Plotly** charts. It calculates accuracy trends over time and identifies the top 10 "trouble words" for you to focus on.
+
+### 4. Integration & Convenience
+- **`setup_startup.py`**: Connects the project to your operating system. It creates global batch file shortcuts (`Practice.bat`, `Dashboard.bat`) and ensures `app.py` is called by Windows every time you log in.
+
 ## Installation
 
 ### 1. Prerequisites
