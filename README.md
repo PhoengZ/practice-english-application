@@ -30,8 +30,8 @@ graph TD
     end
 
     subgraph "User Interface Layer"
-        DB <--- "Word Data & Stats" ---> APP[app.py / Practice]
-        DB <--- "Aggregated Data" ---> DASH[dashboard.py / Dashboard]
+        DB <--> |"Word Data & Stats"| APP[app.py / Practice]
+        DB <--> |"Aggregated Data"| DASH[dashboard.py / Dashboard]
     end
 
     subgraph "Infrastructure Layer"
