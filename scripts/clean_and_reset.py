@@ -7,12 +7,18 @@ from ingest import ingest_from_text
 
 load_dotenv()
 
-# Use absolute paths so it works from anywhere
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "practice.db")
-INPUT_FILE = os.path.join(BASE_DIR, "oxford.txt")
-CLEAN_FILE = os.path.join(BASE_DIR, "oxford_clean.txt")
+# Scripts are now in scripts/ folder
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "data", "practice.db")
+INPUT_FILE = os.path.join(BASE_DIR, "data", "oxford.txt")
+CLEAN_FILE = os.path.join(BASE_DIR, "data", "oxford_clean.txt")
 TYPHOON_API_KEY = os.getenv("TYPHOON_API_KEY")
+
+# Add root to sys.path to allow imports from src
+import sys
+sys.path.append(BASE_DIR)
+from src.core.ingest import ingest_from_text
+from src.database.db_manager import init_db
 
 client = OpenAI(api_key=TYPHOON_API_KEY, base_url="https://api.opentyphoon.ai/v1")
 
@@ -173,7 +179,6 @@ def clean_ocr_text():
 
 if __name__ == "__main__":
     # Ensure DB is initialized first
-    from db_manager import init_db
     init_db()
     
     clean_database()

@@ -5,12 +5,13 @@ import subprocess
 import os
 import io
 from datetime import datetime
-from db_manager import should_run_today, mark_day_completed, DB_PATH, get_logical_day
 
-# Fix Windows encoding for Thai characters
-if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
+# Ensure we can import from src when running from any directory
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT_DIR not in sys.path:
+    sys.path.append(ROOT_DIR)
+
+from src.database.db_manager import should_run_today, mark_day_completed, DB_PATH, get_logical_day
 
 def get_words_for_practice(count=10):
     conn = sqlite3.connect(DB_PATH)
@@ -108,7 +109,9 @@ def run_practice():
             
             if user_input.lower() == 'dashboard':
                 print("Opening Dashboard...")
-                subprocess.Popen(["streamlit", "run", "dashboard.py"], shell=True)
+                # Get the absolute path to dashboard.py
+                dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
+                subprocess.Popen(["streamlit", "run", dashboard_path], shell=True)
                 continue
 
             try:
@@ -140,7 +143,8 @@ if __name__ == "__main__":
         run_practice()
     elif wants_dashboard:
         print("Opening Dashboard...")
-        subprocess.Popen(["streamlit", "run", "dashboard.py"], shell=True)
+        dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
+        subprocess.Popen(["streamlit", "run", dashboard_path], shell=True)
     else:
         print("Already practiced today! See you after 7 AM tomorrow.")
         print("💡 Tip: Use 'Practice' command to force start anyway.")

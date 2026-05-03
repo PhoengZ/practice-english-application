@@ -3,7 +3,15 @@ import sqlite3
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from db_manager import DB_PATH
+import os
+import sys
+
+# Ensure we can import from src when running from any directory
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT_DIR not in sys.path:
+    sys.path.append(ROOT_DIR)
+
+from src.database.db_manager import DB_PATH
 
 st.set_page_config(page_title="English Progress Dashboard", layout="wide")
 
