@@ -36,8 +36,10 @@ graph TD
 
     subgraph "Infrastructure Layer"
         SETUP[scripts/setup_startup.py] --> REG[Windows Registry]
+        SETUP_TASK[scripts/setup_task.py] --> TASK[Scheduled Task]
         SETUP --> PATH[System PATH]
-        REG -- "Auto-Run" --> APP
+        REG -- "Auto-Run (Logon)" --> APP
+        TASK -- "Daily Run (7:00 AM)" --> APP
         PATH -- "Global Command" --> APP
         PATH -- "Global Command" --> DASH
     end
@@ -74,7 +76,8 @@ practice-english-application/
 - **`src/ui/dashboard.py`**: A **Streamlit** application that queries the database to generate interactive **Plotly** charts. It calculates accuracy trends over time and identifies the top 10 "trouble words" for you to focus on.
 
 ### 4. Integration & Convenience
-- **`scripts/setup_startup.py`**: Connects the project to your operating system. It creates global batch file shortcuts (`Practice.bat`, `Dashboard.bat`) in the root directory and ensures `src/ui/app.py` is called by Windows every time you log in.
+- **`scripts/setup_startup.py`**: Connects the project to your operating system. It creates global batch file shortcuts (`Practice.bat`, `Dashboard.bat`) and adds the app to the Windows Registry for auto-run on logon. **Must be run within the `practice-english` environment.**
+- **`scripts/setup_task.py`**: Ensures the app runs daily at 7:00 AM using Windows Task Scheduler and verifies the logon registry entry.
 
 ## Installation
 
@@ -106,10 +109,13 @@ python scripts/clean_and_reset.py
 ```
 
 ### 5. Setup Global Commands and Startup
-Run the setup script to enable global commands and auto-startup (Restarting terminal required after this):
+Activate your environment and run the setup scripts:
 ```powershell
+conda activate practice-english
 python scripts/setup_startup.py
+python scripts/setup_task.py
 ```
+*(Restarting terminal is required after this to enable global commands.)*
 
 ## Usage
 
