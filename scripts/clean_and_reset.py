@@ -17,30 +17,29 @@ TYPHOON_API_KEY = os.getenv("TYPHOON_API_KEY")
 import sys
 sys.path.append(BASE_DIR)
 from src.core.ingest import ingest_from_text
-from src.database.db_manager import init_db
+from src.database.db_manager import init_db, get_db_connection
 
 client = OpenAI(api_key=TYPHOON_API_KEY, base_url="https://api.opentyphoon.ai/v1")
 
 def clean_database():
     """Wipes the database tables to start fresh."""
     print("🧹 Cleaning database...")
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    # Check if tables exist before deleting
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='words'")
-    if cursor.fetchone():
-        cursor.execute("DELETE FROM words")
-    
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='activity_log'")
-    if cursor.fetchone():
-        cursor.execute("DELETE FROM activity_log")
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        # Check if tables exist before deleting
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='words'")
+        if cursor.fetchone():
+            cursor.execute("DELETE FROM words")
         
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='app_state'")
-    if cursor.fetchone():
-        cursor.execute("DELETE FROM app_state")
-        
-    conn.commit()
-    conn.close()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='activity_log'")
+        if cursor.fetchone():
+            cursor.execute("DELETE FROM activity_log")
+            
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='app_state'")
+        if cursor.fetchone():
+            cursor.execute("DELETE FROM app_state")
+            
+        conn.commit()
     print("✅ Database is now empty.")
 
 def refine_cleaned_text(text):

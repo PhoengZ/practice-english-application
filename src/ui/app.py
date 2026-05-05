@@ -11,74 +11,75 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
-from src.database.db_manager import should_run_today, mark_day_completed, DB_PATH, get_logical_day
+from src.database.db_manager import should_run_today, mark_day_completed, DB_PATH, get_logical_day, get_db_connection
 
 def get_words_for_practice(count=10):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    # Prioritize words least tested or least correct
-    cursor.execute('''
-        SELECT id, english_word, word_type, word_level, thai_translation 
-        FROM words 
-        ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
-        LIMIT ?
-    ''', (count,))
-    words = cursor.fetchall()
-    conn.close()
-    return words
+    """Fetches a batch of words for the daily practice session."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        # Prioritize words least tested or least correct
+        cursor.execute('''
+            SELECT id, english_word, word_type, word_level, thai_translation 
+            FROM words 
+            ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
+            LIMIT ?
+        ''', (count,))
+        return cursor.fetchall()
 
 def get_distractors(correct_thai, count=3):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT thai_translation 
-        FROM words 
-        WHERE thai_translation != ? 
-        GROUP BY thai_translation
-        ORDER BY RANDOM() 
-        LIMIT ?
-    ''', (correct_thai, count))
-    distractors = [row[0] for row in cursor.fetchall()]
-    conn.close()
+    """Fetches random Thai translations to use as distractors in multiple-choice questions."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT thai_translation 
+            FROM words 
+            WHERE thai_translation != ? 
+            GROUP BY thai_translation
+            ORDER BY RANDOM() 
+            LIMIT ?
+        ''', (correct_thai, count))
+        distractors = [row[0] for row in cursor.fetchall()]
+    
     # If not enough distractors in DB, add some placeholders
     while len(distractors) < count:
         distractors.append(f"Incorrect Option {len(distractors)+1}")
     return distractors
 
 def update_word_stats(word_id, is_correct):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    now = datetime.now()
-    if is_correct:
+    """Updates the statistics for a specific word after a quiz answer."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        now = datetime.now()
+        if is_correct:
+            cursor.execute('''
+                UPDATE words 
+                SET times_tested = times_tested + 1, 
+                    times_correct = times_correct + 1, 
+                    last_tested_date = ? 
+                WHERE id = ?
+            ''', (now, word_id))
+        else:
+            cursor.execute('''
+                UPDATE words 
+                SET times_tested = times_tested + 1, 
+                    last_tested_date = ? 
+                WHERE id = ?
+            ''', (now, word_id))
+        
+        # Update activity log
+        logical_day = get_logical_day()
         cursor.execute('''
-            UPDATE words 
-            SET times_tested = times_tested + 1, 
-                times_correct = times_correct + 1, 
-                last_tested_date = ? 
-            WHERE id = ?
-        ''', (now, word_id))
-    else:
-        cursor.execute('''
-            UPDATE words 
-            SET times_tested = times_tested + 1, 
-                last_tested_date = ? 
-            WHERE id = ?
-        ''', (now, word_id))
-    
-    # Update activity log
-    logical_day = get_logical_day()
-    cursor.execute('''
-        INSERT INTO activity_log (date, words_practiced, correct_answers)
-        VALUES (?, 1, ?)
-        ON CONFLICT(date) DO UPDATE SET
-            words_practiced = words_practiced + 1,
-            correct_answers = correct_answers + ?
-    ''', (logical_day, 1 if is_correct else 0, 1 if is_correct else 0))
-    
-    conn.commit()
-    conn.close()
+            INSERT INTO activity_log (date, words_practiced, correct_answers)
+            VALUES (?, 1, ?)
+            ON CONFLICT(date) DO UPDATE SET
+                words_practiced = words_practiced + 1,
+                correct_answers = correct_answers + ?
+        ''', (logical_day, 1 if is_correct else 0, 1 if is_correct else 0))
+        
+        conn.commit()
 
 def run_practice():
+    """Orchestrates the interactive CLI practice session."""
     print("=== English Practice Session ===")
     print("Commands: 'Rest' to stop today, 'Dashboard' to view progress")
     
@@ -109,9 +110,9 @@ def run_practice():
             
             if user_input.lower() == 'dashboard':
                 print("Opening Dashboard...")
-                # Get the absolute path to dashboard.py
                 dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
-                subprocess.Popen(["streamlit", "run", dashboard_path])
+                # Use sys.executable to ensure we use the same environment
+                subprocess.Popen([sys.executable, "-m", "streamlit", "run", dashboard_path])
                 continue
 
             try:
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     elif wants_dashboard:
         print("Opening Dashboard...")
         dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
-        subprocess.Popen(["streamlit", "run", dashboard_path])
+        subprocess.Popen([sys.executable, "-m", "streamlit", "run", dashboard_path])
     else:
         print("Already practiced today! See you after 7 AM tomorrow.")
         print("💡 Tip: Use 'Practice' command to force start anyway.")
