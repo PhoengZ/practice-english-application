@@ -6,3 +6,5 @@ python-dotenv
 typhoon-ocr
 plotly
 matplotlib
+scikit-learn
+seaborn
