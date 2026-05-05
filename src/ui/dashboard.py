@@ -122,12 +122,16 @@ with tab3:
         """)
         
         # Prepare data for clustering
-        X = tested_words[['times_tested', 'accuracy']].values
-        X_scaled = StandardScaler().fit_transform(X)
-        
-        # Apply DBSCAN
-        db = DBSCAN(eps=0.5, min_samples=5).fit(X_scaled)
-        tested_words['cluster'] = db.labels_
+        if len(tested_words) >= 5:
+            X = tested_words[['times_tested', 'accuracy']].values
+            X_scaled = StandardScaler().fit_transform(X)
+            
+            # Apply DBSCAN
+            db = DBSCAN(eps=0.5, min_samples=5).fit(X_scaled)
+            tested_words['cluster'] = db.labels_
+        else:
+            # Fallback if not enough data for clustering
+            tested_words['cluster'] = 0
         
         # Map clusters to meaningful names
         def map_cluster(c, acc, count):
@@ -170,13 +174,19 @@ with tab3:
         # Summary & Recommendations
         st.markdown("### 💡 บทสรุปและคำแนะนำ (Summary & Recommendations)")
         
-        top_mistake_type = tested_words.groupby('word_type')['mistake_count'].sum().idxmax()
-        top_mistake_level = tested_words.groupby('word_level')['mistake_count'].sum().idxmax()
-        
-        st.success(f"""
-        - **จุดที่ต้องระวังที่สุด (Biggest Weakness):** คำประเภท **{top_mistake_type}** ที่ระดับ **{top_mistake_level}**
-        - **คำแนะนำ (Recommendation):** ควรเน้นฝึกฝนคำในกลุ่มนี้เป็นพิเศษผ่านระบบ Practice โดยใช้โหมดเน้นย้ำ
-        """)
+        if tested_words['mistake_count'].sum() > 0:
+            top_mistake_type = tested_words.groupby('word_type')['mistake_count'].sum().idxmax()
+            top_mistake_level = tested_words.groupby('word_level')['mistake_count'].sum().idxmax()
+            
+            st.success(f"""
+            - **จุดที่ต้องระวังที่สุด (Biggest Weakness):** คำประเภท **{top_mistake_type}** ที่ระดับ **{top_mistake_level}**
+            - **คำแนะนำ (Recommendation):** ควรเน้นฝึกฝนคำในกลุ่มนี้เป็นพิเศษผ่านระบบ Practice โดยใช้โหมดเน้นย้ำ
+            """)
+        else:
+            st.success("""
+            - **ยอดเยี่ยมมาก! (Excellent!):** คุณยังไม่มีข้อผิดพลาดที่บันทึกไว้ในระบบ
+            - **คำแนะนำ (Recommendation):** เรียนรู้คำศัพท์ใหม่ๆ ต่อไปเพื่อเพิ่มพูนความรู้
+            """)
         
     else:
         st.warning("ไม่มีข้อมูลการฝึกฝนเพียงพอสำหรับการวิเคราะห์ (Insufficient practice data for analysis.)")
