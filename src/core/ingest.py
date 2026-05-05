@@ -9,7 +9,7 @@ if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 from src.core.typhoon_utils import extract_text_from_pdf, translate_to_thai_batch, parse_oxford_ocr
-from src.database.db_manager import DB_PATH
+from src.database.db_manager import DB_PATH, get_db_connection
 
 def ingest_from_text(ocr_text):
     """Ingests words directly from OCR text string."""
@@ -35,25 +35,24 @@ def ingest_from_text(ocr_text):
     translations = translate_to_thai_batch(word_type_pairs)
 
     # 3. Save to DB
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    count = 0
-    for eng, w_type, level in entries:
-        # Match using composite key
-        thai = translations.get(f"{eng}|{w_type}", "")
-        try:
-            cursor.execute(
-                "INSERT OR IGNORE INTO words (english_word, word_type, word_level, thai_translation) VALUES (?, ?, ?, ?)", 
-                (eng, w_type, level, thai)
-            )
-            if cursor.rowcount > 0:
-                count += 1
-        except Exception as e:
-            print(f"Error inserting {eng}: {e}")
-            
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        count = 0
+        for eng, w_type, level in entries:
+            # Match using composite key
+            thai = translations.get(f"{eng}|{w_type}", "")
+            try:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO words (english_word, word_type, word_level, thai_translation) VALUES (?, ?, ?, ?)", 
+                    (eng, w_type, level, thai)
+                )
+                if cursor.rowcount > 0:
+                    count += 1
+            except Exception as e:
+                print(f"Error inserting {eng}: {e}")
+                
+        conn.commit()
     print(f"Successfully ingested {count} new entries into the database.")
 
 def ingest_pdf(pdf_path):
