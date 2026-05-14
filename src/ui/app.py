@@ -3,7 +3,6 @@ import random
 import sys
 import subprocess
 import os
-import io
 from datetime import datetime
 
 # Ensure we can import from src when running from any directory
@@ -11,23 +10,34 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
-from src.database.db_manager import should_run_today, mark_day_completed, DB_PATH, get_logical_day, get_db_connection
+from src.database.db_manager import (
+    should_run_today, mark_day_completed, DB_PATH, get_logical_day, 
+    get_db_connection, save_infinite_score, get_best_infinite_score
+)
 
 def get_words_for_practice(count=10):
-    """Fetches a batch of words for the daily practice session."""
+    """Fetches words for practice."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        # Prioritize words least tested or least correct
-        cursor.execute('''
-            SELECT id, english_word, word_type, word_level, thai_translation 
-            FROM words 
-            ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
-            LIMIT ?
-        ''', (count,))
+        if count:
+            # Prioritize words least tested or least correct for daily practice
+            cursor.execute('''
+                SELECT id, english_word, word_type, word_level, thai_translation 
+                FROM words 
+                ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
+                LIMIT ?
+            ''', (count,))
+        else:
+            # Random order for infinite mode
+            cursor.execute('''
+                SELECT id, english_word, word_type, word_level, thai_translation 
+                FROM words 
+                ORDER BY RANDOM()
+            ''')
         return cursor.fetchall()
 
 def get_distractors(correct_thai, count=3):
-    """Fetches random Thai translations to use as distractors in multiple-choice questions."""
+    """Fetches random Thai translations to use as distractors."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('''
@@ -40,13 +50,12 @@ def get_distractors(correct_thai, count=3):
         ''', (correct_thai, count))
         distractors = [row[0] for row in cursor.fetchall()]
     
-    # If not enough distractors in DB, add some placeholders
     while len(distractors) < count:
         distractors.append(f"Incorrect Option {len(distractors)+1}")
     return distractors
 
 def update_word_stats(word_id, is_correct):
-    """Updates the statistics for a specific word after a quiz answer."""
+    """Updates the statistics for a specific word."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         now = datetime.now()
@@ -66,7 +75,6 @@ def update_word_stats(word_id, is_correct):
                 WHERE id = ?
             ''', (now, word_id))
         
-        # Update activity log
         logical_day = get_logical_day()
         cursor.execute('''
             INSERT INTO activity_log (date, words_practiced, correct_answers)
@@ -75,17 +83,76 @@ def update_word_stats(word_id, is_correct):
                 words_practiced = words_practiced + 1,
                 correct_answers = correct_answers + ?
         ''', (logical_day, 1 if is_correct else 0, 1 if is_correct else 0))
-        
         conn.commit()
 
-def run_practice():
-    """Orchestrates the interactive CLI practice session."""
-    print("=== English Practice Session ===")
-    print("Commands: 'Rest' to stop today, 'Dashboard' to view progress")
-    
-    words = get_words_for_practice()
+def run_infinite_mode():
+    """Runs the infinite mode: continues until the first mistake."""
+    print("\n" + "="*40)
+    print("🚀 INFINITE MODE: SUDDEN DEATH")
+    print("Answer correctly to keep going.")
+    print("One mistake and the game ends!")
+    print("="*40 + "\n")
+
+    best_score = get_best_infinite_score()
+    print(f"Current High Score: {best_score}")
+
+    score = 0
+    start_time = datetime.now()
+
+    while True:
+        words = get_words_for_practice(count=1)
+        if not words:
+            print("No vocabulary found!")
+            break
+
+        word_id, eng, w_type, level, thai = words[0]
+        print(f"\nWord {score + 1}: {eng} ({w_type}) [{level}]")
+
+        choices = get_distractors(thai) + [thai]
+        random.shuffle(choices)
+
+        for idx, choice in enumerate(choices):
+            print(f"{idx + 1}. {choice}")
+
+        user_input = input("\nYour choice (or 'exit'): ").strip()
+
+        if user_input.lower() == 'exit':
+            break
+
+        try:
+            choice_idx = int(user_input) - 1
+            if 0 <= choice_idx < len(choices):
+                selected = choices[choice_idx]
+                if selected == thai:
+                    print("✅ Correct!")
+                    update_word_stats(word_id, True)
+                    score += 1
+                else:
+                    print(f"❌ Wrong! The correct answer was: {thai}")
+                    update_word_stats(word_id, False)
+                    break
+            else:
+                print(f"Please enter a number between 1 and {len(choices)}.")
+        except ValueError:
+            print("Invalid input. Enter a number or 'exit'.")
+
+    end_time = datetime.now()
+    duration = int((end_time - start_time).total_seconds())
+    save_infinite_score(score, duration)
+
+    print(f"\nGame Over! Final Score: {score}")
+    if score > best_score:
+        print(f"🏆 NEW HIGH SCORE! (Previous: {best_score})")
+    else:
+        print(f"High Score: {best_score}")
+    print(f"Time played: {duration // 60}m {duration % 60}s")
+
+def run_daily_practice():
+    """Orchestrates the daily practice session."""
+    print("\n=== Daily Practice Session ===")
+    words = get_words_for_practice(count=10)
     if not words:
-        print("No vocabulary found. Please ingest some words first!")
+        print("No vocabulary found!")
         return
 
     score = 0
@@ -93,7 +160,6 @@ def run_practice():
 
     for i, (word_id, eng, w_type, level, thai) in enumerate(words):
         print(f"\nWord {i+1}/{total}: {eng} ({w_type}) [{level}]")
-        
         choices = get_distractors(thai) + [thai]
         random.shuffle(choices)
         
@@ -101,51 +167,71 @@ def run_practice():
             print(f"{idx + 1}. {choice}")
         
         while True:
-            user_input = input("\nYour choice (or command): ").strip()
-            
-            if user_input.lower() == 'rest':
-                print("Resting for the day. See you tomorrow!")
-                mark_day_completed()
+            user_input = input("\nYour choice (or 'exit'): ").strip()
+            if user_input.lower() == 'exit':
                 sys.exit(0)
-            
-            if user_input.lower() == 'dashboard':
-                print("Opening Dashboard...")
-                dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
-                # Use sys.executable to ensure we use the same environment
-                subprocess.Popen([sys.executable, "-m", "streamlit", "run", dashboard_path])
-                continue
 
             try:
                 choice_idx = int(user_input) - 1
                 if 0 <= choice_idx < len(choices):
-                    selected = choices[choice_idx]
-                    if selected == thai:
-                        print("Correct! Excellent.")
+                    if choices[choice_idx] == thai:
+                        print("✅ Correct!")
                         update_word_stats(word_id, True)
                         score += 1
                     else:
-                        print(f"Wrong. The correct answer was: {thai}")
+                        print(f"❌ Wrong. Correct: {thai}")
                         update_word_stats(word_id, False)
                     break
                 else:
-                    print(f"Please enter a number between 1 and {len(choices)}.")
+                    print(f"Please enter 1-{len(choices)}.")
             except ValueError:
-                print("Invalid input. Enter a number, 'Rest', or 'Dashboard'.")
+                print("Invalid input.")
 
     print(f"\nSession Finished! Score: {score}/{total}")
     mark_day_completed()
 
-if __name__ == "__main__":
-    # Check for command line arguments
-    force_run = len(sys.argv) > 1 and sys.argv[1].lower() == '--force'
-    wants_dashboard = len(sys.argv) > 1 and sys.argv[1].lower() == 'dashboard'
+def show_dashboard():
+    print("Opening Dashboard...")
+    dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
+    subprocess.Popen([sys.executable, "-m", "streamlit", "run", dashboard_path])
 
-    if should_run_today() or force_run:
-        run_practice()
-    elif wants_dashboard:
-        print("Opening Dashboard...")
-        dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
-        subprocess.Popen([sys.executable, "-m", "streamlit", "run", dashboard_path])
-    else:
-        print("Already practiced today! See you after 7 AM tomorrow.")
-        print("💡 Tip: Use 'Practice' command to force start anyway.")
+if __name__ == "__main__":
+    wants_dashboard = len(sys.argv) > 1 and sys.argv[1].lower() == 'dashboard'
+    is_startup = len(sys.argv) > 1 and sys.argv[1].lower() == '--startup'
+    force_run = len(sys.argv) > 1 and sys.argv[1].lower() == '--force'
+
+    if is_startup:
+        if should_run_today():
+            run_daily_practice()
+        sys.exit(0)
+    
+    if wants_dashboard:
+        show_dashboard()
+        sys.exit(0)
+        
+    if force_run:
+        run_daily_practice()
+        sys.exit(0)
+
+    while True:
+        print("\n--- Welcome to Practice English ---")
+        print("1. Daily Practice")
+        print("2. Infinite Mode (Sudden Death)")
+        print("3. Dashboard")
+        print("4. Exit")
+        
+        choice = input("\nSelect an option: ").strip()
+        
+        if choice == '1':
+            run_daily_practice()
+            break
+        elif choice == '2':
+            run_infinite_mode()
+            break
+        elif choice == '3':
+            show_dashboard()
+        elif choice == '4':
+            print("Goodbye!")
+            break
+        else:
+            print("Invalid choice.")

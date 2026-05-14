@@ -54,8 +54,43 @@ def init_db():
                 value TEXT
             )
         ''')
+
+        # Infinite mode scores
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS infinite_scores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                score INTEGER,
+                duration_seconds INTEGER,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         
         conn.commit()
+
+def save_infinite_score(score, duration_seconds):
+    """Saves a score from an infinite mode session."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO infinite_scores (score, duration_seconds)
+            VALUES (?, ?)
+        ''', (score, duration_seconds))
+        conn.commit()
+
+def get_best_infinite_score():
+    """Returns the highest score achieved in infinite mode."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(score) FROM infinite_scores")
+        result = cursor.fetchone()
+        return result[0] if result[0] is not None else 0
+
+def get_infinite_history():
+    """Returns all infinite mode scores."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT score, duration_seconds, timestamp FROM infinite_scores ORDER BY timestamp DESC")
+        return cursor.fetchall()
 
 def get_logical_day():
     """Returns the current date string adjusted for 7 AM rollover."""

@@ -23,11 +23,43 @@ def add_to_path(folder_path):
     except Exception as e:
         print(f"❌ Error updating PATH: {e}")
 
+def get_conda_python(env_name="practice-english"):
+    """Attempts to find the python executable for a specific conda environment."""
+    try:
+        # Try to use conda to find the environment path
+        result = subprocess.run(['conda', 'info', '--envs', '--json'], capture_output=True, text=True)
+        if result.returncode == 0:
+            import json
+            data = json.loads(result.stdout)
+            for env_path in data.get('envs', []):
+                if env_name in env_path:
+                    python_exe = os.path.join(env_path, "python.exe")
+                    if os.path.exists(python_exe):
+                        return python_exe
+    except Exception:
+        pass
+    
+    # Fallback to common locations
+    user_home = os.path.expanduser("~")
+    common_paths = [
+        os.path.join(user_home, "miniconda3", "envs", env_name, "python.exe"),
+        os.path.join(user_home, "anaconda3", "envs", env_name, "python.exe"),
+    ]
+    for path in common_paths:
+        if os.path.exists(path):
+            return path
+            
+    return sys.executable
+
 def create_shortcuts():
     # Scripts is in scripts/, Root is one level up
     script_dir = os.path.dirname(os.path.realpath(__file__))
     root_dir = os.path.dirname(script_dir)
-    python_exe = sys.executable
+    
+    # Use the conda environment python instead of current sys.executable
+    python_exe = get_conda_python()
+    print(f"🔎 Using Python: {python_exe}")
+    
     app_path = os.path.join(root_dir, "src", "ui", "app.py")
     dashboard_path = os.path.join(root_dir, "src", "ui", "dashboard.py")
     
@@ -40,7 +72,7 @@ def create_shortcuts():
     # 1. Create Practice.bat in root
     practice_bat = os.path.join(root_dir, "Practice.bat")
     with open(practice_bat, "w") as f:
-        f.write(f'@echo off\n"{python_exe}" "{app_path}" --force\npause\n')
+        f.write(f'@echo off\n"{python_exe}" "{app_path}"\npause\n')
     print(f"✅ Created {practice_bat}")
 
     # 2. Create Dashboard.bat in root
@@ -54,14 +86,14 @@ def create_shortcuts():
     add_to_path(root_dir)
 
 def add_to_startup():
-    python_exe = sys.executable
+    python_exe = get_conda_python()
     script_dir = os.path.dirname(os.path.realpath(__file__))
     root_dir = os.path.dirname(script_dir)
     app_path = os.path.join(root_dir, "src", "ui", "app.py")
     
     # Use cmd /c to set working directory before running python
     # Ensure all paths are quoted to handle spaces
-    cmd = f'cmd /c "cd /d \"{root_dir}\" && \"{python_exe}\" \"{app_path}\""'
+    cmd = f'cmd /c "cd /d \"{root_dir}\" && \"{python_exe}\" \"{app_path}\" --startup"'
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)

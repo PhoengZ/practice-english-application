@@ -23,41 +23,45 @@ def get_data():
     """Fetches data from the database with caching."""
     try:
         if not os.path.exists(DB_PATH):
-            return pd.DataFrame(), pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
         with sqlite3.connect(DB_PATH) as conn:
             words_df = pd.read_sql_query("SELECT * FROM words", conn)
             activity_df = pd.read_sql_query("SELECT * FROM activity_log ORDER BY date", conn)
-        return words_df, activity_df
+            infinite_df = pd.read_sql_query("SELECT * FROM infinite_scores ORDER BY timestamp", conn)
+        return words_df, activity_df, infinite_df
     except Exception as e:
         st.error(f"Error connecting to database: {e}")
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 st.title("📈 English Improvement Dashboard")
 st.markdown("Track your learning progress and identify areas for improvement.")
 
-words_df, activity_df = get_data()
+words_df, activity_df, infinite_df = get_data()
 
 if words_df.empty and activity_df.empty:
     st.warning("Database is empty or not found. Please ingest some words and start practicing!")
     st.stop()
 
 # Metrics
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Total Words in DB", len(words_df))
+    st.metric("Total Words", len(words_df))
 with col2:
     total_practiced = words_df['times_tested'].sum()
-    st.metric("Total Practice Count", int(total_practiced))
+    st.metric("Total Practice", int(total_practiced))
 with col3:
     if total_practiced > 0:
         overall_acc = (words_df['times_correct'].sum() / total_practiced) * 100
     else:
         overall_acc = 0
     st.metric("Overall Accuracy", f"{overall_acc:.1f}%")
+with col4:
+    best_inf = infinite_df['score'].max() if not infinite_df.empty else 0
+    st.metric("Infinite High Score", int(best_inf))
 
 # Main Dashboard Layout
-tab1, tab2, tab3 = st.tabs(["Daily Trends", "Word Analysis", "Learning Pattern Analysis"])
+tab1, tab2, tab3, tab4 = st.tabs(["Daily Trends", "Word Analysis", "Learning Pattern Analysis", "Infinite Mode Analysis"])
 
 with tab1:
     st.subheader("Daily Accuracy & Activity Trend")
@@ -75,6 +79,15 @@ with tab1:
                       markers=True)
         fig.update_layout(yaxis_range=[0, 105])
         st.plotly_chart(fig, use_container_width=True)
+
+        # Performance trend (Moving Average)
+        if len(activity_df) > 1:
+            activity_df['rolling_acc'] = activity_df['accuracy'].rolling(window=3).mean()
+            fig_trend = px.line(activity_df, x='date', y='rolling_acc',
+                                title='Vocabulary Retention Trend (3-Day Moving Average)',
+                                labels={'rolling_acc': 'Average Accuracy (%)', 'date': 'Date'},
+                                color_discrete_sequence=['orange'])
+            st.plotly_chart(fig_trend, use_container_width=True)
         
         # Bar chart for words practiced
         fig2 = px.bar(activity_df, x='date', y='words_practiced',
@@ -214,6 +227,38 @@ with tab3:
         
     else:
         st.warning("ไม่มีข้อมูลการฝึกฝนเพียงพอสำหรับการวิเคราะห์ (Insufficient practice data for analysis.)")
+
+with tab4:
+    st.subheader("🚀 Infinite Mode Performance")
+    if not infinite_df.empty:
+        # Score Trend
+        fig_inf = px.line(infinite_df, x='timestamp', y='score',
+                          title='Infinite Mode Score Trend',
+                          labels={'score': 'Score', 'timestamp': 'Date & Time'},
+                          markers=True)
+        st.plotly_chart(fig_inf, use_container_width=True)
+        
+        # Duration vs Score Scatter
+        fig_inf_scat = px.scatter(infinite_df, x='duration_seconds', y='score',
+                                 title='Score vs. Session Duration',
+                                 labels={'duration_seconds': 'Duration (seconds)', 'score': 'Score'},
+                                 trendline="ols")
+        st.plotly_chart(fig_inf_scat, use_container_width=True)
+        
+        # Stats summary
+        col_inf1, col_inf2, col_inf3 = st.columns(3)
+        with col_inf1:
+            st.metric("Average Score", f"{infinite_df['score'].mean():.1f}")
+        with col_inf2:
+            st.metric("Total Games", len(infinite_df))
+        with col_inf3:
+            avg_duration = infinite_df['duration_seconds'].mean()
+            st.metric("Avg. Duration", f"{avg_duration:.1f}s")
+            
+        st.markdown("### Recent Infinite Mode Sessions")
+        st.dataframe(infinite_df.sort_values(by='timestamp', ascending=False))
+    else:
+        st.info("Play Infinite Mode to see your high scores and trends here!")
 
 # Sidebar Controls
 with st.sidebar:
