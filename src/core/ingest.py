@@ -10,6 +10,7 @@ if ROOT_DIR not in sys.path:
 
 from src.core.typhoon_utils import extract_text_from_pdf, translate_to_thai_batch, parse_oxford_ocr
 from src.database.db_manager import DB_PATH, get_db_connection
+from src.database.vector_manager import vector_manager
 
 def ingest_from_text(ocr_text):
     """Ingests words directly from OCR text string."""
@@ -35,6 +36,8 @@ def ingest_from_text(ocr_text):
     translations = translate_to_thai_batch(word_type_pairs)
 
     # 3. Save to DB
+    new_word_data = [] # To store (id, thai, type) for vector indexing
+    
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
@@ -42,18 +45,30 @@ def ingest_from_text(ocr_text):
         for eng, w_type, level in entries:
             # Match using composite key
             thai = translations.get(f"{eng}|{w_type}", "")
+            if not thai:
+                continue
+                
             try:
                 cursor.execute(
                     "INSERT OR IGNORE INTO words (english_word, word_type, word_level, thai_translation) VALUES (?, ?, ?, ?)", 
                     (eng, w_type, level, thai)
                 )
                 if cursor.rowcount > 0:
+                    word_id = cursor.lastrowid
+                    new_word_data.append((word_id, thai, w_type))
                     count += 1
             except Exception as e:
                 print(f"Error inserting {eng}: {e}")
                 
         conn.commit()
-    print(f"Successfully ingested {count} new entries into the database.")
+    
+    # 4. Save to Vector DB
+    if new_word_data:
+        print(f"Indexing {len(new_word_data)} words into VectorDB...")
+        ids, thais, types = zip(*new_word_data)
+        vector_manager.add_batch_to_vector_db(list(ids), list(thais), list(types))
+        
+    print(f"Successfully ingested {count} new entries into the database and VectorDB.")
 
 def ingest_pdf(pdf_path):
     # In a real scenario, we'd use Typhoon OCR on the file

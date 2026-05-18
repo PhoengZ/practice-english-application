@@ -23,14 +23,30 @@ class VectorManager:
 
     def add_to_vector_db(self, word_id, thai_text, word_type):
         """Adds a single word translation to the vector database."""
+        self.add_batch_to_vector_db([word_id], [thai_text], [word_type])
+
+    def add_batch_to_vector_db(self, ids, thai_texts, word_types):
+        """Adds a batch of word translations to the vector database."""
+        if not ids:
+            return
+            
         model = self._get_model()
-        embedding = model.encode(thai_text).tolist()
+        embeddings = model.encode(thai_texts).tolist()
+        
+        str_ids = [str(wid) for wid in ids]
+        metadatas = [{"word_type": wt, "thai": tt} for wt, tt in zip(word_types, thai_texts)]
         
         self.collection.upsert(
-            ids=[str(word_id)],
-            embeddings=[embedding],
-            metadatas=[{"word_type": word_type, "thai": thai_text}]
+            ids=str_ids,
+            embeddings=embeddings,
+            metadatas=metadatas
         )
+
+    def clear_all(self):
+        """Clears all data from the vector collection."""
+        self.client.delete_collection(name="thai_vocab")
+        self.collection = self.client.get_or_create_collection(name="thai_vocab")
+        print("✅ Vector database (ChromaDB) cleared.")
 
     def get_semantic_distractors(self, thai_text, word_type, count=3):
         """Fetches semantically similar distractors filtered by word type."""

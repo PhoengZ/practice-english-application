@@ -18,11 +18,12 @@ import sys
 sys.path.append(BASE_DIR)
 from src.core.ingest import ingest_from_text
 from src.database.db_manager import init_db, get_db_connection
+from src.database.vector_manager import vector_manager
 
 client = OpenAI(api_key=TYPHOON_API_KEY, base_url="https://api.opentyphoon.ai/v1")
 
 def clean_database():
-    """Wipes the database tables to start fresh."""
+    """Wipes the database tables and VectorDB to start fresh."""
     print("🧹 Cleaning database...")
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -40,7 +41,10 @@ def clean_database():
             cursor.execute("DELETE FROM app_state")
             
         conn.commit()
-    print("✅ Database is now empty.")
+    
+    # Also clear VectorDB
+    vector_manager.clear_all()
+    print("✅ Databases are now empty.")
 
 def refine_cleaned_text(text):
     """Post-processes LLM output to split entries with multiple types or levels."""
