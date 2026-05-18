@@ -36,19 +36,48 @@ def get_words_for_practice(count=10):
             ''')
         return cursor.fetchall()
 
-def get_distractors(correct_thai, count=3):
-    """Fetches random Thai translations to use as distractors."""
+def get_distractors(correct_thai, word_type=None, count=3):
+    """Fetches random Thai translations to use as distractors, prioritizing the same word type."""
+    distractors = []
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT thai_translation 
-            FROM words 
-            WHERE thai_translation != ? 
-            GROUP BY thai_translation
-            ORDER BY RANDOM() 
-            LIMIT ?
-        ''', (correct_thai, count))
-        distractors = [row[0] for row in cursor.fetchall()]
+        
+        # 1. Try to get distractors of the same type
+        if word_type:
+            cursor.execute('''
+                SELECT thai_translation 
+                FROM words 
+                WHERE thai_translation != ? AND word_type = ?
+                GROUP BY thai_translation
+                ORDER BY RANDOM() 
+                LIMIT ?
+            ''', (correct_thai, word_type, count))
+            distractors = [row[0] for row in cursor.fetchall()]
+        
+        # 2. If not enough, fill with random words of any type
+        if len(distractors) < count:
+            remaining = count - len(distractors)
+            placeholders = ', '.join(['?'] * len(distractors))
+            
+            # Construct query to avoid duplicates already in distractors
+            exclude_clause = ""
+            params = [correct_thai]
+            if distractors:
+                exclude_clause = f"AND thai_translation NOT IN ({placeholders})"
+                params.extend(distractors)
+            
+            query = f'''
+                SELECT thai_translation 
+                FROM words 
+                WHERE thai_translation != ?
+                {exclude_clause}
+                GROUP BY thai_translation
+                ORDER BY RANDOM() 
+                LIMIT ?
+            '''
+            params.append(remaining)
+            cursor.execute(query, tuple(params))
+            distractors.extend([row[0] for row in cursor.fetchall()])
     
     while len(distractors) < count:
         distractors.append(f"Incorrect Option {len(distractors)+1}")
@@ -108,7 +137,7 @@ def run_infinite_mode():
         word_id, eng, w_type, level, thai = words[0]
         print(f"\nWord {score + 1}: {eng} ({w_type}) [{level}]")
 
-        choices = get_distractors(thai) + [thai]
+        choices = get_distractors(thai, word_type=w_type) + [thai]
         random.shuffle(choices)
 
         for idx, choice in enumerate(choices):
@@ -160,7 +189,7 @@ def run_daily_practice():
 
     for i, (word_id, eng, w_type, level, thai) in enumerate(words):
         print(f"\nWord {i+1}/{total}: {eng} ({w_type}) [{level}]")
-        choices = get_distractors(thai) + [thai]
+        choices = get_distractors(thai, word_type=w_type) + [thai]
         random.shuffle(choices)
         
         for idx, choice in enumerate(choices):
