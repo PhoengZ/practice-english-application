@@ -15,6 +15,8 @@ from src.database.db_manager import (
     get_db_connection, save_infinite_score, get_best_infinite_score
 )
 
+from src.database.vector_manager import vector_manager
+
 def get_words_for_practice(count=10):
     """Fetches words for practice."""
     with get_db_connection() as conn:
@@ -37,50 +39,61 @@ def get_words_for_practice(count=10):
         return cursor.fetchall()
 
 def get_distractors(correct_thai, word_type=None, count=3):
-    """Fetches random Thai translations to use as distractors, prioritizing the same word type."""
+    """Fetches semantic distractors from VectorDB, falling back to random SQL if needed."""
     distractors = []
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        
-        # 1. Try to get distractors of the same type
-        if word_type:
-            cursor.execute('''
-                SELECT thai_translation 
-                FROM words 
-                WHERE thai_translation != ? AND word_type = ?
-                GROUP BY thai_translation
-                ORDER BY RANDOM() 
-                LIMIT ?
-            ''', (correct_thai, word_type, count))
-            distractors = [row[0] for row in cursor.fetchall()]
-        
-        # 2. If not enough, fill with random words of any type
-        if len(distractors) < count:
-            remaining = count - len(distractors)
-            placeholders = ', '.join(['?'] * len(distractors))
+    
+    # 1. Try semantic search from VectorDB
+    try:
+        distractors = vector_manager.get_semantic_distractors(correct_thai, word_type, count)
+    except Exception as e:
+        print(f"Warning: Semantic search failed, falling back to random: {e}")
+
+    # 2. If not enough semantic distractors, fill with random words of same type from SQL
+    if len(distractors) < count:
+        remaining = count - len(distractors)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
             
-            # Construct query to avoid duplicates already in distractors
-            exclude_clause = ""
-            params = [correct_thai]
-            if distractors:
-                exclude_clause = f"AND thai_translation NOT IN ({placeholders})"
-                params.extend(distractors)
+            # Construct exclusion clause
+            exclude_list = [correct_thai] + distractors
+            placeholders = ', '.join(['?'] * len(exclude_list))
             
             query = f'''
                 SELECT thai_translation 
                 FROM words 
-                WHERE thai_translation != ?
-                {exclude_clause}
+                WHERE thai_translation NOT IN ({placeholders})
+                AND word_type = ?
                 GROUP BY thai_translation
                 ORDER BY RANDOM() 
                 LIMIT ?
             '''
-            params.append(remaining)
-            cursor.execute(query, tuple(params))
+            cursor.execute(query, tuple(exclude_list + [word_type, remaining]))
+            sql_distractors = [row[0] for row in cursor.fetchall()]
+            distractors.extend(sql_distractors)
+
+    # 3. Last resort: Fill with any random words if still not enough
+    if len(distractors) < count:
+        remaining = count - len(distractors)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            exclude_list = [correct_thai] + distractors
+            placeholders = ', '.join(['?'] * len(exclude_list))
+            
+            query = f'''
+                SELECT thai_translation 
+                FROM words 
+                WHERE thai_translation NOT IN ({placeholders})
+                GROUP BY thai_translation
+                ORDER BY RANDOM() 
+                LIMIT ?
+            '''
+            cursor.execute(query, tuple(exclude_list + [remaining]))
             distractors.extend([row[0] for row in cursor.fetchall()])
     
     while len(distractors) < count:
         distractors.append(f"Incorrect Option {len(distractors)+1}")
+        
+    random.shuffle(distractors)
     return distractors
 
 def update_word_stats(word_id, is_correct):
