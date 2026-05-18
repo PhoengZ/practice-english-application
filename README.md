@@ -4,14 +4,14 @@
 This project is designed for tech-savvy individuals who spend their entire day at a computer but are too "lazy" (or busy!) to open a physical book to study. It aims to bridge the gap between daily work and language learning by integrating vocabulary practice directly into the computer's startup routine. With an interactive dashboard to measure progress, it turns a passive routine into an active learning session.
 
 ## Features
-- **Auto-Startup Practice**: Automatically prompts a quick 10-word quiz when you start your computer for the first time each day (after 7:00 AM).
+- **Semantic Similarity Distractors**: Powered by ChromaDB and Sentence-Transformers, the quiz provides semantically related Thai options (e.g., if the word is "Happy", it shows "Joyful" or "Glad" instead of random words).
 - **Type-Aware Translations**: Powered by Typhoon LLM, the system understands the difference between parts of speech (e.g., *act* as a verb vs. *act* as a noun).
 - **Interactive Dashboard**: A beautiful Streamlit dashboard with Plotly graphs to track your accuracy and identify words that need more focus.
 - **Global Shortcuts**: Launch practice or the dashboard from any terminal using `Practice` or `Dashboard` commands.
 
 ## Project Architecture
 
-The application follows a modular architecture consisting of four main layers: **Data Ingestion**, **Storage**, **Application Logic**, and **Infrastructure**.
+The application follows a modular architecture consisting of five main layers: **Data Ingestion**, **Relational Storage**, **Vector Storage**, **Application Logic**, and **Infrastructure**.
 
 ### High-Level Architecture Diagram
 ```mermaid
@@ -26,11 +26,13 @@ graph TD
     subgraph "Storage Layer"
         CLEAN --> INGEST[src/core/ingest.py]
         INGEST -- "Type-Aware Translation" --> TYPHOON
-        INGEST --> DB[(data/practice.db)]
+        INGEST --> DB[(SQLite: data/practice.db)]
+        INGEST --> VDB[(ChromaDB: data/chroma_db)]
     end
 
     subgraph "User Interface Layer"
         DB <--> |"Word Data & Stats"| APP[src/ui/app.py / Practice]
+        VDB <--> |"Semantic Similarity"| APP
         DB <--> |"Aggregated Data"| DASH[src/ui/dashboard.py / Dashboard]
     end
 
@@ -53,10 +55,14 @@ The project has been restructured for better scalability and maintainability:
 practice-english-application/
 ├── src/                # Source code
 │   ├── core/           # Core logic (ingestion, OCR, utilities)
-│   ├── database/       # Database management
+│   ├── database/       # Database management (SQLite & VectorDB)
 │   └── ui/             # User interface (CLI app, dashboard)
 ├── scripts/            # Maintenance and setup scripts
-├── data/               # Data files (PDFs, text, database)
+├── tests/              # Unit and integration tests
+├── data/               # Data files (DBs, backups, source files)
+│   ├── backups/        # SQLite database backups
+│   └── chroma_db/      # Vector database storage
+├── .gemini/            # Agent activity logs and memory
 ├── Practice.bat        # Shortcut for practice session
 ├── Dashboard.bat       # Shortcut for dashboard
 └── requirements.txt    # Project dependencies
@@ -66,11 +72,14 @@ practice-english-application/
 
 ### 1. The Data Pipeline (One-time setup)
 - **`scripts/clean_and_reset.py`**: The orchestrator. It reads the messy `data/oxford.txt`, sends chunks to **Typhoon LLM** via `src/core/typhoon_utils.py` to fix OCR errors, and saves a perfectly formatted `data/oxford_clean.txt`.
-- **`src/core/ingest.py`**: Takes the cleaned text, identifies unique words, and requests **Type-Aware Translations** before populating the SQLite database.
+- **`src/core/ingest.py`**: Takes the cleaned text, identifies unique words, and requests **Type-Aware Translations**. It populates **SQLite** for relational data and **ChromaDB** for semantic vectors.
 
-### 2. Practice & Logic (Daily use)
-- **`src/database/db_manager.py`**: The "Brain" of the project. It defines the database schema and calculates the **Logical Day** (resetting at 7:00 AM instead of midnight), ensuring you only get prompted once per day.
-- **`src/ui/app.py`**: The core interactive CLI. It fetches words from the DB based on your performance (prioritizing words you struggle with), handles the quiz logic, and updates your statistics in real-time.
+### 2. Dual-Storage System
+- **`src/database/db_manager.py`**: Manages the SQLite database for word metadata, levels, and user learning statistics (accuracy, logical day tracking).
+- **`src/database/vector_manager.py`**: Manages the ChromaDB vector store. It uses `sentence-transformers` (`paraphrase-multilingual-MiniLM-L12-v2`) to generate embeddings for Thai translations, enabling semantic similarity search.
+
+### 3. Practice & Logic (Daily use)
+- **`src/ui/app.py`**: The core interactive CLI. It fetches words from the SQLite DB based on performance. It uses the `VectorManager` to generate "smart" distractors that are semantically similar in Thai, making the quiz more challenging and educational.
 
 ### 3. Insights & Visualization
 - **`src/ui/dashboard.py`**: A **Streamlit** application that queries the database to generate interactive **Plotly** charts. It calculates accuracy trends over time and identifies the top 10 "trouble words" for you to focus on.
