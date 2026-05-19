@@ -72,6 +72,7 @@ def create_shortcuts():
     # 1. Create Practice.bat in root
     practice_bat = os.path.join(root_dir, "Practice.bat")
     with open(practice_bat, "w") as f:
+        # Use absolute paths and ensure the right python is used
         f.write(f'@echo off\n"{python_exe}" "{app_path}"\npause\n')
     print(f"✅ Created {practice_bat}")
 

@@ -27,15 +27,26 @@ def migrate_data():
         total = len(words)
         print(f"Found {total} words to migrate.")
 
+        batch_size = 100
+        current_batch = []
+        
         for i, (word_id, thai, w_type, eng) in enumerate(words):
             if not thai:
                 continue
             
-            # Index into ChromaDB
-            vector_manager.add_to_vector_db(word_id, thai, w_type)
+            current_batch.append((word_id, thai, w_type))
             
-            if (i + 1) % 100 == 0 or (i + 1) == total:
+            if len(current_batch) >= batch_size:
+                ids, thais, types = zip(*current_batch)
+                vector_manager.add_batch_to_vector_db(list(ids), list(thais), list(types))
+                current_batch = []
                 print(f"Migrated {i + 1}/{total} words... (Current: {eng})")
+
+        # Handle remaining words in the last batch
+        if current_batch:
+            ids, thais, types = zip(*current_batch)
+            vector_manager.add_batch_to_vector_db(list(ids), list(thais), list(types))
+            print(f"Migrated all {total} words.")
 
         print("\nMigration completed successfully!")
     except Exception as e:
