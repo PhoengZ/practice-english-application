@@ -15,6 +15,7 @@ venv.bak/
 # SQLite Database
 data/practice.db
 practice.db
+data/chroma_db/
 
 # OCR / Generated files
 data/oxford_clean.txt

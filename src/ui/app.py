@@ -92,6 +92,10 @@ def get_distractors(correct_thai, word_type=None, count=3):
     
     while len(distractors) < count:
         distractors.append(f"Incorrect Option {len(distractors)+1}")
+    
+    # Final safety check to ensure all distractors are unique and exclude the correct answer
+    # dict.fromkeys preserves order while removing duplicates
+    distractors = [d for d in list(dict.fromkeys(distractors)) if d != correct_thai][:count]
         
     random.shuffle(distractors)
     return distractors

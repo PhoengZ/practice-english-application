@@ -49,22 +49,26 @@ class VectorManager:
         print("✅ Vector database (ChromaDB) cleared.")
 
     def get_semantic_distractors(self, thai_text, word_type, count=3):
-        """Fetches semantically similar distractors filtered by word type."""
+        """Fetches semantically similar distractors filtered by word type, ensuring unique Thai strings."""
         model = self._get_model()
         query_embedding = model.encode(thai_text).tolist()
         
-        # We fetch more than count to allow filtering out the original word
+        # Fetch a larger pool to account for potential duplicate Thai translations in the DB
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=count + 5,
+            n_results=count + 15,
             where={"word_type": word_type}
         )
         
         distractors = []
+        seen_thai = {thai_text} # Start with the correct answer to exclude it
+        
         if results and results['metadatas']:
             for meta in results['metadatas'][0]:
-                if meta['thai'] != thai_text:
-                    distractors.append(meta['thai'])
+                candidate_thai = meta['thai']
+                if candidate_thai not in seen_thai:
+                    distractors.append(candidate_thai)
+                    seen_thai.add(candidate_thai)
                     if len(distractors) >= count:
                         break
         
