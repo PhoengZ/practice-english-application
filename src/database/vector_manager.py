@@ -1,8 +1,4 @@
 import os
-import sqlite3
-import chromadb
-from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -11,14 +7,32 @@ MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 class VectorManager:
     def __init__(self):
-        self.client = chromadb.PersistentClient(path=CHROMA_PATH)
-        self.collection = self.client.get_or_create_collection(name="thai_vocab")
-        self.model = None # Lazy load model
+        self.client = None
+        self.collection = None
+        self.model = None
+
+    def _get_collection(self):
+        """Lazy initializer for ChromaDB client and collection."""
+        if self.collection is None:
+            try:
+                import chromadb
+                self.client = chromadb.PersistentClient(path=CHROMA_PATH)
+                self.collection = self.client.get_or_create_collection(name="thai_vocab")
+            except Exception as e:
+                print(f"Error initializing ChromaDB: {e}")
+                raise
+        return self.collection
 
     def _get_model(self):
+        """Lazy initializer for the embedding model."""
         if self.model is None:
-            print(f"Loading embedding model: {MODEL_NAME}...")
-            self.model = SentenceTransformer(MODEL_NAME)
+            try:
+                from sentence_transformers import SentenceTransformer
+                print(f"Loading embedding model: {MODEL_NAME}...")
+                self.model = SentenceTransformer(MODEL_NAME)
+            except Exception as e:
+                print(f"Error loading SentenceTransformer: {e}")
+                raise
         return self.model
 
     def add_to_vector_db(self, word_id, thai_text, word_type):
@@ -30,13 +44,14 @@ class VectorManager:
         if not ids:
             return
             
+        collection = self._get_collection()
         model = self._get_model()
         embeddings = model.encode(thai_texts).tolist()
         
         str_ids = [str(wid) for wid in ids]
         metadatas = [{"word_type": wt, "thai": tt} for wt, tt in zip(word_types, thai_texts)]
         
-        self.collection.upsert(
+        collection.upsert(
             ids=str_ids,
             embeddings=embeddings,
             metadatas=metadatas
@@ -44,17 +59,32 @@ class VectorManager:
 
     def clear_all(self):
         """Clears all data from the vector collection."""
-        self.client.delete_collection(name="thai_vocab")
+        if self.client is None:
+            import chromadb
+            self.client = chromadb.PersistentClient(path=CHROMA_PATH)
+        
+        try:
+            self.client.delete_collection(name="thai_vocab")
+        except Exception:
+            # Collection might not exist yet
+            pass
+            
         self.collection = self.client.get_or_create_collection(name="thai_vocab")
         print("✅ Vector database (ChromaDB) cleared.")
 
     def get_semantic_distractors(self, thai_text, word_type, count=3):
         """Fetches semantically similar distractors filtered by word type, ensuring unique Thai strings."""
-        model = self._get_model()
+        try:
+            collection = self._get_collection()
+            model = self._get_model()
+        except Exception:
+            # Silently fail and allow fallback to SQL in calling code
+            return []
+
         query_embedding = model.encode(thai_text).tolist()
         
         # Fetch a larger pool to account for potential duplicate Thai translations in the DB
-        results = self.collection.query(
+        results = collection.query(
             query_embeddings=[query_embedding],
             n_results=count + 15,
             where={"word_type": word_type}

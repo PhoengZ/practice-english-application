@@ -35,10 +35,11 @@ def ingest_from_text(ocr_text):
     # 2. Translate (word, type) pairs in batches
     translations = translate_to_thai_batch(word_type_pairs)
 
-    # 3. Save to DB
+    # 3. Save to DB and Vector DB
     new_word_data = [] # To store (id, thai, type) for vector indexing
     
-    with get_db_connection() as conn:
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
         
         count = 0
@@ -59,16 +60,21 @@ def ingest_from_text(ocr_text):
                     count += 1
             except Exception as e:
                 print(f"Error inserting {eng}: {e}")
-                
-        conn.commit()
-    
-    # 4. Save to Vector DB
-    if new_word_data:
-        print(f"Indexing {len(new_word_data)} words into VectorDB...")
-        ids, thais, types = zip(*new_word_data)
-        vector_manager.add_batch_to_vector_db(list(ids), list(thais), list(types))
         
-    print(f"Successfully ingested {count} new entries into the database and VectorDB.")
+        # 4. Save to Vector DB before committing SQL
+        if new_word_data:
+            print(f"Indexing {len(new_word_data)} words into VectorDB...")
+            ids, thais, types = zip(*new_word_data)
+            vector_manager.add_batch_to_vector_db(list(ids), list(thais), list(types))
+            
+        conn.commit()
+        print(f"Successfully ingested {count} new entries into the database and VectorDB.")
+    except Exception as e:
+        print(f"❌ Error during ingestion: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def ingest_pdf(pdf_path):
     # In a real scenario, we'd use Typhoon OCR on the file

@@ -11,7 +11,7 @@ This project is designed for tech-savvy individuals who spend their entire day a
 
 ## Project Architecture
 
-The application follows a modular architecture consisting of five main layers: **Data Ingestion**, **Relational Storage**, **Vector Storage**, **Application Logic**, and **Infrastructure**.
+The application follows a modular architecture consisting of four main layers: **Data Layer**, **Storage Layer**, **User Interface Layer**, and **Infrastructure Layer**.
 
 ### High-Level Architecture Diagram
 ```mermaid
@@ -81,10 +81,10 @@ practice-english-application/
 ### 3. Practice & Logic (Daily use)
 - **`src/ui/app.py`**: The core interactive CLI. It fetches words from the SQLite DB based on performance. It uses the `VectorManager` to generate "smart" distractors that are semantically similar in Thai, making the quiz more challenging and educational.
 
-### 3. Insights & Visualization
+### 4. Insights & Visualization
 - **`src/ui/dashboard.py`**: A **Streamlit** application that queries the database to generate interactive **Plotly** charts. It calculates accuracy trends over time and identifies the top 10 "trouble words" for you to focus on.
 
-### 4. Integration & Convenience
+### 5. Integration & Convenience
 - **`scripts/setup_startup.py`**: Connects the project to your operating system. It creates global batch file shortcuts (`Practice.bat`, `Dashboard.bat`) and adds the app to the Windows Registry for auto-run on logon. **Must be run within the `practice-english` environment.**
 - **`scripts/setup_task.py`**: Ensures the app runs daily at 7:00 AM using Windows Task Scheduler and verifies the logon registry entry.
 

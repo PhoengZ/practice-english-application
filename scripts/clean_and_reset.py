@@ -25,9 +25,15 @@ client = OpenAI(api_key=TYPHOON_API_KEY, base_url="https://api.opentyphoon.ai/v1
 def clean_database():
     """Wipes the database tables and VectorDB to start fresh."""
     print("🧹 Cleaning database...")
-    with get_db_connection() as conn:
+    
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
-        # Check if tables exist before deleting
+        
+        # Also clear VectorDB - do this first, if it fails, we haven't touched SQLite
+        vector_manager.clear_all()
+
+        # Wipe tables
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='words'")
         if cursor.fetchone():
             cursor.execute("DELETE FROM words")
@@ -41,10 +47,13 @@ def clean_database():
             cursor.execute("DELETE FROM app_state")
             
         conn.commit()
-    
-    # Also clear VectorDB
-    vector_manager.clear_all()
-    print("✅ Databases are now empty.")
+        print("✅ Databases are now empty.")
+    except Exception as e:
+        print(f"❌ Error during database cleanup: {e}")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def refine_cleaned_text(text):
     """Post-processes LLM output to split entries with multiple types or levels."""

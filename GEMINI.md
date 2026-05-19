@@ -52,3 +52,4 @@ practice-english-application/
 ## Development Workflow
 - **Environment**: ALWAYS use the `practice-english` conda environment to run any scripts or the application. Ensure the `TYPHOON_API_KEY` is set in the `.env` file for core logic to function.
 - **Guidance**: When investigating code, refer to this `GEMINI.md` first to understand component responsibilities.
+- **Testing**: New features should be tested manually via the UI scripts or by adding unit tests in the `tests/` directory.
