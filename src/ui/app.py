@@ -38,6 +38,62 @@ def get_words_for_practice(count=10):
             ''')
         return cursor.fetchall()
 
+def get_words_for_practice_with_focus(focus_type, focus_value, count=10):
+    """Fetches words filtered by level or part of speech type."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        if focus_type == 'level':
+            cursor.execute('''
+                SELECT id, english_word, word_type, word_level, thai_translation 
+                FROM words 
+                WHERE word_level = ?
+                ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
+                LIMIT ?
+            ''', (focus_value, count))
+        elif focus_type == 'type':
+            if focus_value == 'v':
+                types = ('v', 'auxiliary v', 'modal v')
+            elif focus_value == 'n':
+                types = ('n', 'noun')
+            elif focus_value == 'adj':
+                types = ('adj',)
+            elif focus_value == 'adv':
+                types = ('adv',)
+            else:
+                types = None
+
+            if types:
+                placeholders = ', '.join(['?'] * len(types))
+                cursor.execute(f'''
+                    SELECT id, english_word, word_type, word_level, thai_translation 
+                    FROM words 
+                    WHERE word_type IN ({placeholders})
+                    ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
+                    LIMIT ?
+                ''', types + (count,))
+            else:
+                # Other types
+                excluded = ('v', 'auxiliary v', 'modal v', 'n', 'noun', 'adj', 'adv')
+                placeholders = ', '.join(['?'] * len(excluded))
+                cursor.execute(f'''
+                    SELECT id, english_word, word_type, word_level, thai_translation 
+                    FROM words 
+                    WHERE word_type NOT IN ({placeholders})
+                    ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
+                    LIMIT ?
+                ''', excluded + (count,))
+        else:
+            # Fallback
+            cursor.execute('''
+                SELECT id, english_word, word_type, word_level, thai_translation 
+                FROM words 
+                ORDER BY times_tested ASC, times_correct ASC, RANDOM() 
+                LIMIT ?
+            ''', (count,))
+            
+        return cursor.fetchall()
+
 def get_distractors(correct_thai, word_type=None, count=3):
     """Fetches semantic distractors from VectorDB, falling back to random SQL if needed."""
     distractors = []
@@ -236,6 +292,80 @@ def run_daily_practice():
     print(f"\nSession Finished! Score: {score}/{total}")
     mark_day_completed()
 
+def run_focus_practice():
+    """Orchestrates a focused practice session by category."""
+    print("\n=== Focusing Mode Practice ===")
+    print("Choose focus category:")
+    print("1. A1 (CEFR Level)")
+    print("2. A2 (CEFR Level)")
+    print("3. B1 (CEFR Level)")
+    print("4. B2 (CEFR Level)")
+    print("5. v. (Verbs)")
+    print("6. n. (Nouns)")
+    print("7. adj. (Adjectives)")
+    print("8. adv. (Adverbs)")
+    print("9. Other Types")
+    
+    choice = input("\nSelect a focus option (1-9): ").strip()
+    
+    focus_map = {
+        '1': ('level', 'A1', 'A1 Level'),
+        '2': ('level', 'A2', 'A2 Level'),
+        '3': ('level', 'B1', 'B1 Level'),
+        '4': ('level', 'B2', 'B2 Level'),
+        '5': ('type', 'v', 'Verbs'),
+        '6': ('type', 'n', 'Nouns'),
+        '7': ('type', 'adj', 'Adjectives'),
+        '8': ('type', 'adv', 'Adverbs'),
+        '9': ('type', 'other', 'Other Types')
+    }
+    
+    if choice not in focus_map:
+        print("Invalid focus choice.")
+        return
+        
+    focus_type, focus_val, focus_name = focus_map[choice]
+    print(f"\n--- Focus Mode: {focus_name} ---")
+    
+    words = get_words_for_practice_with_focus(focus_type, focus_val, count=10)
+    if not words:
+        print(f"No vocabulary found for focus: {focus_name}!")
+        return
+
+    score = 0
+    total = len(words)
+
+    for i, (word_id, eng, w_type, level, thai) in enumerate(words):
+        print(f"\nWord {i+1}/{total}: {eng} ({w_type}) [{level}]")
+        choices = get_distractors(thai, word_type=w_type) + [thai]
+        random.shuffle(choices)
+        
+        for idx, choice_in in enumerate(choices):
+            print(f"{idx + 1}. {choice_in}")
+        
+        while True:
+            user_input = input("\nYour choice (or 'exit'): ").strip()
+            if user_input.lower() == 'exit':
+                return
+
+            try:
+                choice_idx = int(user_input) - 1
+                if 0 <= choice_idx < len(choices):
+                    if choices[choice_idx] == thai:
+                        print("✅ Correct!")
+                        update_word_stats(word_id, True)
+                        score += 1
+                    else:
+                        print(f"❌ Wrong. Correct: {thai}")
+                        update_word_stats(word_id, False)
+                    break
+                else:
+                    print(f"Please enter 1-{len(choices)}.")
+            except ValueError:
+                print("Invalid input.")
+
+    print(f"\nFocus Session Finished! Score: {score}/{total}")
+
 def show_dashboard():
     print("Opening Dashboard...")
     dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.py")
@@ -263,8 +393,9 @@ if __name__ == "__main__":
         print("\n--- Welcome to Practice English ---")
         print("1. Daily Practice")
         print("2. Infinite Mode (Sudden Death)")
-        print("3. Dashboard")
-        print("4. Exit")
+        print("3. Focusing Mode Practice")
+        print("4. Dashboard")
+        print("5. Exit")
         
         choice = input("\nSelect an option: ").strip()
         
@@ -275,8 +406,11 @@ if __name__ == "__main__":
             run_infinite_mode()
             break
         elif choice == '3':
-            show_dashboard()
+            run_focus_practice()
+            break
         elif choice == '4':
+            show_dashboard()
+        elif choice == '5':
             print("Goodbye!")
             break
         else:
