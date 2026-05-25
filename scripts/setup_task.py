@@ -3,13 +3,22 @@ import sys
 import subprocess
 import winreg
 
+# Try to import get_conda_python from setup_startup to maintain consistency
+try:
+    from setup_startup import get_conda_python
+except ImportError:
+    # Fail-safe local version or fallback
+    def get_conda_python():
+        return sys.executable
+
 def setup_logon_registry():
-    python_exe = sys.executable
+    python_exe = get_conda_python()
     script_dir = os.path.dirname(os.path.realpath(__file__))
     root_dir = os.path.dirname(script_dir)
     app_path = os.path.join(root_dir, "src", "ui", "app.py")
     
-    cmd = f'cmd /c "cd /d \"{root_dir}\" && \"{python_exe}\" \"{app_path}\""'
+    # Use --startup flag to match setup_startup.py behavior
+    cmd = f'cmd /c "cd /d \"{root_dir}\" && \"{python_exe}\" \"{app_path}\" --startup"'
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
@@ -20,7 +29,7 @@ def setup_logon_registry():
         print(f"❌ Error updating registry: {e}")
 
 def create_daily_task():
-    python_exe = sys.executable
+    python_exe = get_conda_python()
     script_dir = os.path.dirname(os.path.realpath(__file__))
     root_dir = os.path.dirname(script_dir)
     app_path = os.path.join(root_dir, "src", "ui", "app.py")
